@@ -16,6 +16,33 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    # The web host applies EF Core migrations at start-up, so the integration tests need a
+    # real PostgreSQL. Redis is included because /health/ready probes it. Ports match the
+    # development configuration the test host loads (127.0.0.1:5433 and :6379).
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: tuesday
+          POSTGRES_USER: tuesday
+          POSTGRES_PASSWORD: tuesday_dev_password
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U tuesday -d tuesday"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
     steps:
       - uses: actions/checkout@v4
 
