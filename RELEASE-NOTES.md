@@ -106,7 +106,8 @@ proxy.
   been reset to their true state. What is now real: a restore rehearsal with row counts
   (`scripts/ops/backup-restore.sh`), an enforced nonce CSP checked in a browser and pinned by
   tests, a CycloneDX SBOM with a reviewed dependency allowlist, and a clean-room scan that runs
-  in CI. Still unproven: the 200-user soak, a second replica with a shared key ring, and an
+  in CI. Measured since: 200 live circuits on a 5,000-item board, p95 416 ms to the first grid row.
+  Still unproven: 200 users editing concurrently, 200 circuits across replicas, a second replica with a shared key ring, and an
   operator-run restore drill.
 - **Every unknown URL returned a 404 with an empty body**, so browsers replaced it with their own
   error screen. `UseStatusCodePagesWithReExecute` never fired (Blazor answers an unmatched route

@@ -282,7 +282,7 @@ This is **0.9.0**, a release candidate. The honest limit list is in
 | Dashboard, health, logging, security headers, container | ✅ shipped |
 | Sub-items | ✅ inline expander, own column set with its own editor |
 | Drag reorder in the table grid | ✅ pointer drag and Alt+Arrow, including sub-item panels |
-| Performance checkpoints | ✅ 5k: p95 136 ms · 100k: p95 1.77 s (`scripts/perf`) |
+| Performance checkpoints | ✅ 200 circuits on a 5k board: p95 416 ms to first row · 100k HTTP render p95 1.77 s |
 | Cursor pagination, idempotency keys, SSRF guard, webhook retries | ✅ shipped |
 | Nonce-based CSP, CycloneDX SBOM with reviewed allowlist, backup/restore drill | ✅ shipped |
 | Two replicas behind nginx, shared key ring, Redis realtime fan-out | ✅ shipped (`docker/compose.replicas.yaml`) |

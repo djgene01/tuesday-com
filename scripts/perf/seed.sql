@@ -61,6 +61,13 @@ from items i
 join board_columns c on c."BoardId" = i."BoardId" and c."Type" = 'Status'
 where i."BoardId" = (select "Id" from nboard);
 
+-- A board with no view renders an empty state and the "measurement" then times a 15 KB page.
+-- Copy the source board's views so the fixture actually draws the 5,000-row grid.
+insert into board_views ("Id", "TenantId", "BoardId", "Name", "Type", "Position", "SettingsJson")
+select gen_random_uuid(), n."TenantId", n."Id", v."Name", v."Type", v."Position", v."SettingsJson"
+from nboard n
+join board_views v on v."BoardId" = (select "Id" from src) and v."Position" = 0;
+
 select 'seeded ' || :'name' || ' with ' || count(*) || ' items and ' ||
        (select count(*) from item_column_values v join items i on i."Id" = v."ItemId"
          where i."BoardId" = (select "Id" from nboard)) || ' cells' as result
