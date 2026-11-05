@@ -46,7 +46,8 @@ services:
       - app-files:/var/tuesday/files
       - ${IDENTITY_SIGNING_PFX:-./keys/idp.pfx}:/var/tuesday/keys/idp.pfx:ro
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      # CMD-SHELL runs /bin/sh, which is dash in this image and has no /dev/tcp; bash does.
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
       interval: 30s
       timeout: 3s
       retries: 5

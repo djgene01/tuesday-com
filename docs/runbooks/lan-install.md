@@ -20,6 +20,9 @@ by anyone on the segment — acceptable on a trusted VLAN/VPN, not on a shared n
 - Docker inside an LXC needs **nesting** enabled on the container.
 - Debian's `docker.io` package in trixie does **not** ship the CLI: install `docker-cli` separately,
   plus `docker-compose` (2.26) and `containerd`.
+- `compose.release.yaml`'s app healthcheck runs `/dev/tcp` through `CMD-SHELL`, which is **dash** in
+  the aspnet image and fails, leaving a perfectly healthy app marked `unhealthy`. The probe now runs
+  `bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'`.
 - The container's `/etc/resolv.conf` pointed at a gateway that did not answer DNS. Outbound TCP to
   `1.1.1.1:53` worked, so the fix was `nameserver 1.1.1.1`. Proxmox may rewrite the file on boot.
 - `registry-1.docker.io` was **unreachable** from this network even with DNS fixed. Base images were
