@@ -1,26 +1,26 @@
-# Release notes — Tuesday.com 0.9.3 (release candidate)
+# Release notes — Tuesday.com 0.9.4 (release candidate)
 
 **Status:** release candidate for an internal work-tracking deployment. Not 1.0.
-**Date:** 2026-11-05 · **Version:** 0.9.3 · **Image tag:** `tuesday-web:0.9.3`
+**Date:** 2026-11-05 · **Version:** 0.9.4 · **Image tag:** `tuesday-web:0.9.4`
 
-Changes since 0.9.2:
+Changes since 0.9.3:
 
-- **Production first run is now usable.** Migrations run in every environment (they were
-  Development-only), an empty installation can be given its first admin from
-  `Bootstrap__AdminEmail` / `Bootstrap__AdminPassword`, new boards are scaffolded with three
-  groups, four columns and a grid view, and the grid has an "+ Add item" row. Before this, a
-  Production container started healthy with no schema, and a fresh board could never receive
-  its first item.
-- **Automation chains**: ordered multi-action rules with a depth-3 `LoopPrevented` guard.
-- **MCP server**: `src/Tuesday.Mcp`, four tools over stdio, plus a Claude Code skill.
-- `libgssapi-krb5-2` in the runtime image; the Kerberos load warning is gone.
-- **Invitations**: a single-use `tue_inv_` link, stored only as a hash, expiring in 7 days. The
-  invitee chooses their own password at `/invite/{token}`; when email is disabled the admin sees the
-  link once. The shared `Tuesday!Demo1` literal is gone from the invite path (P6-18 closed).
+- **Accessibility: axe is clean.** All twelve primary routes (landing, login, workspace, board,
+  dashboard, item, sub-item columns, search, notifications, security, tokens, 404) have **zero**
+  WCAG 2.0/2.1 A+AA violations, down from serious colour-contrast failures on four of them.
+- **Brand colour darkened** from `#6161ff` to `#5252e0`: 4.2:1 against the canvas at 12 px was below
+  AA, and 4.5:1 was exactly the limit under white button text. The new hue measures 5.4:1 and 5.8:1.
+- The sub-item column editor's "Remove" control moved from `ink-faint` to `ink-soft` (4.4:1 → 4.8:1).
+- `scripts/a11y/axe.js` is now in the repo: it sweeps every route, writes `artifacts/axe.json`, and
+  exits non-zero on any serious or critical finding.
+- **Invitations** (0.9.3 had the code but not the release): single-use `tue_inv_` links stored only as
+  a SHA-256 hash, 7-day expiry, invitee-chosen password at `/invite/{token}`, link shown once to the
+  admin when email is disabled (P6-18 closed).
+- Verified inside the Production container: sign-in as the bootstrap admin, invite
+  `quinn@tuesday.local`, accept the link, sign in as that user (200 `/workspace`, Viewer role).
 
-This build exists so the team has a real, installable system to work from while the UI/UX pass
-begins. It is feature-complete for the core loop — boards, views, collaboration, automations,
-API — and deliberately unproven on operational load. Read "Known limitations" before deploying.
+---
+
 
 ---
 

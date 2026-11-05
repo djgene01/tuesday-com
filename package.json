@@ -9,6 +9,7 @@
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.11",
+    "axe-core": "^4.14.0",
     "puppeteer-core": "^24.43.1",
     "tailwindcss": "^4.1.11"
   }

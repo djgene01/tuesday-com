@@ -24,7 +24,8 @@
 
 @theme {
   /* Brand */
-  --color-brand: #6161ff;
+  /* 4.2:1 at 12px on the canvas was below AA; this hue measures 5.4 on canvas and 5.8 under white. */
+  --color-brand: #5252e0;
   --color-brand-hover: #5151d5;
   --color-brand-press: #4747bb;
   --color-brand-tint: #ececff;
