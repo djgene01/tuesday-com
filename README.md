@@ -8,6 +8,7 @@ Boards, typed columns, five views, threaded collaboration, automations and a sig
 built on .NET 10, PostgreSQL and Blazor.
 
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![CI](https://github.com/djgene01/tuesday-com/actions/workflows/ci.yml/badge.svg)](https://github.com/djgene01/tuesday-com/actions/workflows/ci.yml)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Blazor](https://img.shields.io/badge/Blazor-Interactive%20Server-512BD4?logo=blazor&logoColor=white)](https://learn.microsoft.com/aspnet/core/blazor/)
 [![Tests](https://img.shields.io/badge/tests-103%20passing-brightgreen)](#testing)
