@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.RegularExpressions;
 
 namespace Tuesday.Tests.Integration;
@@ -40,7 +41,9 @@ public sealed class ContentSecurityPolicyTests : IClassFixture<TuesdayWebFactory
         var nonceMatch = Regex.Match(html, "nonce=\"([^\"]+)\"", RegexOptions.IgnoreCase);
         Assert.True(nonceMatch.Success, "the rendered shell has no nonce attribute");
 
-        var nonce = nonceMatch.Groups[1].Value;
+        // Razor HTML-encodes characters in attributes, so "+" arrives as "&#x2B;" and the
+        // header compare would fail on an otherwise correct nonce.
+        var nonce = WebUtility.HtmlDecode(nonceMatch.Groups[1].Value);
 
         Assert.False(string.IsNullOrWhiteSpace(nonce));
 
@@ -53,10 +56,17 @@ public sealed class ContentSecurityPolicyTests : IClassFixture<TuesdayWebFactory
         }
 
         // The bootstrap script and the import map must both carry it, or the browser blocks them.
-        Assert.Matches("nonce=\"" + Regex.Escape(nonce) + "\"", html);
-        // ImportMap renders the attribute with a capital N; HTML attribute names are
-        // case-insensitive, and so is this match.
-        Assert.Matches("(?i)type=\"importmap\"[^>]*nonce=\"" + Regex.Escape(nonce) + "\"", html);
+        // Match the decoded values: Razor writes "+" as "&#x2B;" inside attributes.
+        var pageNonces = Regex.Matches(html, "nonce=\"([^\"]+)\"", RegexOptions.IgnoreCase)
+            .Select(m => WebUtility.HtmlDecode(m.Groups[1].Value))
+            .ToList();
+
+        Assert.True(pageNonces.Count >= 2, $"expected the bootstrap and import map to be nonced, found {pageNonces.Count}");
+        Assert.All(pageNonces, value => Assert.Equal(nonce, value));
+
+        var importMap = Regex.Match(html, "(?is)<script[^>]*type=\"importmap\"[^>]*>");
+        Assert.True(importMap.Success, "the shell has no import map");
+        Assert.Matches("(?i)nonce=\"[^\"]+\"", importMap.Value);
     }
 
     [Fact]
@@ -77,6 +87,6 @@ public sealed class ContentSecurityPolicyTests : IClassFixture<TuesdayWebFactory
     {
         var html = await response.Content.ReadAsStringAsync();
 
-        return Regex.Match(html, "nonce=\"([^\"]+)\"", RegexOptions.IgnoreCase).Groups[1].Value;
+        return WebUtility.HtmlDecode(Regex.Match(html, "nonce=\"([^\"]+)\"", RegexOptions.IgnoreCase).Groups[1].Value);
     }
 }
