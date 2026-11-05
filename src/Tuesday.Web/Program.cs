@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.DataProtection;
+using Tuesday.Infrastructure.Security;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -35,6 +37,12 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddOpenApi();
 
+// Every replica must share one key ring. The default is a file under the container's home
+// directory, which dies with the container and differs per replica.
+builder.Services.AddDataProtection()
+    .SetApplicationName("tuesday")
+    .PersistKeysToDatabase();
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
@@ -43,6 +51,11 @@ builder.Services.AddSingleton<Tuesday.Web.Collaboration.BoardBroadcaster>();
 builder.Services.AddSingleton<Tuesday.Application.Collaboration.IUpdateBroadcaster>(
     provider => provider.GetRequiredService<Tuesday.Web.Collaboration.BoardBroadcaster>());
 builder.Services.AddSingleton<Tuesday.Web.Collaboration.AttachmentLinks>();
+
+// A fixed name matters behind a load balancer: the default name embeds a per-instance
+// discriminator, so a form rendered by one replica is rejected by another even though the
+// key ring is shared.
+builder.Services.AddAntiforgery(options => options.Cookie.Name = "tuesday.antiforgery");
 
 builder.Services.AddCascadingAuthenticationState();
 

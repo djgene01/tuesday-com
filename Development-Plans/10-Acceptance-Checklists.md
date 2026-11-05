@@ -33,7 +33,7 @@ Each phase section ends with a **user validation gate**: a person, not a test, c
 | P0-6 ☑ | Configuration loads from environment; no secret in source | Config dump with redaction |
 | P0-7 ☑ | Structured logging emits a correlation id | One captured log line |
 | P0-8 ☑ | CI runs build + unit and is green | Pipeline run |
-| P0-9 ○ | Container image builds and runs locally | Image tag + `docker ps` |
+| P0-9 ☑ | Container image builds and runs locally | `tuesday-web:0.9.1`, 372 MB, runs as uid 1654, `/health/ready` healthy (database + Redis + storage) |
 
 **Exit criteria:** the four commands (restore, build, test, run) succeed from a clean clone on a clean machine.
 
@@ -172,9 +172,9 @@ Each phase section ends with a **user validation gate**: a person, not a test, c
 | P6-1 ☑ | Dashboard with chart/count/list widgets over a board | **yes** | `p6.js`: 500 items / 3 groups / by-status / by-group sections |
 | P6-2 ☑ | Widget respects the viewer's permissions | **yes** | `guest-item.js`: guest sees no write affordances |
 | P6-3 ☑ | **Backup taken and restored into a scratch environment** | **yes** | `scripts/ops/backup-restore.sh`: 168 KB dump restored into a scratch DB; 9 tables compared row-for-row, all matched; scratch dropped |
-| P6-4 ☐ | **Rollback rehearsed**: deploy N+1, roll back to N, sign-in and write work | **no** | — |
-| P6-5 ☐ | Second web replica added with shared key ring and affinity; no sign-outs | **no** | — |
-| P6-6 ○ | WebSocket upgrade verified at the proxy | **no proxy in front yet** | SignalR verified direct only (`p4b.js`) |
+| P6-4 ◐ | **Rollback rehearsed**: deploy N+1, roll back to N, sign-in and write work | **partial** | replica restart under traffic keeps sessions (ring lives in the database); rolling back to an image **older than 0.9.1** still signs users out, because that build has no shared ring |
+| P6-5 ☑ | Second web replica added with shared key ring and affinity; no sign-outs | **yes** | `docker/compose.replicas.yaml`: key ring in `data_protection_keys`, fixed antiforgery cookie, `ip_hash` upstream. Proven: session from A accepted by B; login token from A posted to B; A stopped, B still served the session |
+| P6-6 ☑ | WebSocket upgrade verified at the proxy | **yes** | nginx 1.29 with `Upgrade`/`Connection` mapping and 3600 s read timeout; sub-item panel expanded through `:8081` with the circuit live |
 | P6-7 ☐ | Perf targets met at 200 users, 5k-item board | **no — never measured** | — |
 | P6-8 ○ | axe clean (no serious/critical) on all primary routes | **no** | — |
 | P6-9 ☑ | Security headers present; CSP enforced after report-only week | **yes — enforced directly** | Nonce-based `script-src` (no `unsafe-inline`), `object-src 'none'`, `form-action`, `connect-src` for the circuit; inline styles allowed because grid/timeline geometry is inline. Verified in Edge: 0 violations, circuit live, import map nonced. `ContentSecurityPolicyTests` pins it |

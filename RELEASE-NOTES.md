@@ -59,7 +59,11 @@ Stated plainly because they are real. Each maps to an open item in
 10. **Operator runbooks are incomplete.** Only the signing-certificate runbook exists
     (`docs/runbooks/`). Restore, session revocation, replica drain, automation disable and
     disk recovery are not written.
-11. **API hardening is partial.** Cursor pagination, `Idempotency-Key`, a per-token daily quota,
+11. **Multi-instance is real but realtime is not.** Two replicas share a key ring in the
+    database, so sessions, antiforgery tokens and API quotas cross replicas. `BoardBroadcaster`
+    is still an in-process singleton: an update posted on one replica does not reach a circuit
+    held by the other, so a Redis backplane remains outstanding.
+12. **API hardening is partial.** Cursor pagination, `Idempotency-Key`, a per-token daily quota,
     an SSRF guard and webhook retry/auto-disable are shipped and tested. Still missing: OpenAPI
     coverage is a single document snapshot rather than per-endpoint contract tests, the webhook
     signature carries no timestamp so a captured body can be replayed inside its window, and

@@ -47,6 +47,8 @@ public sealed class TuesdayDbContext(
 
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
+    public DbSet<Tuesday.Infrastructure.Security.DataProtectionKey> DataProtectionKeys => Set<Tuesday.Infrastructure.Security.DataProtectionKey>();
+
     public DbSet<ItemColumnValue> ItemColumnValues => Set<ItemColumnValue>();
 
     public DbSet<BoardView> BoardViews => Set<BoardView>();
@@ -219,6 +221,15 @@ public sealed class TuesdayDbContext(
             // Sub-items are read per parent when the grid expands a row, and the parent must
             // live on the same board — enforced by the index, filtered by the query.
             entity.HasIndex(x => new { x.ParentItemId, x.Position });
+        });
+
+        builder.Entity<Tuesday.Infrastructure.Security.DataProtectionKey>(entity =>
+        {
+            entity.ToTable("data_protection_keys");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.FriendlyName).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Xml).IsRequired();
+            entity.HasIndex(x => x.FriendlyName).IsUnique();
         });
 
         builder.Entity<IdempotencyRecord>(entity =>
