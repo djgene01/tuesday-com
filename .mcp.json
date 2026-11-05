@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "tuesday": {
+      "type": "stdio",
+      "command": "dotnet",
+      "args": [
+        "src/Tuesday.Mcp/bin/Release/net10.0/Tuesday.Mcp.dll"
+      ],
+      "env": {
+        "TUESDAY_BASE_URL": "http://127.0.0.1:5205",
+        "TUESDAY_API_TOKEN": "${TUESDAY_API_TOKEN}"
+      }
+    }
+  }
+}

@@ -19,6 +19,7 @@ API — and deliberately unproven on operational load. Read "Known limitations" 
 | Views | Kanban, calendar, timeline, Gantt |
 | Collaboration | Threaded updates with HTML sanitisation, likes, reply/edit/delete, notifications, email preference, in-app search |
 | Automations | ordered multi-action chains, depth-3 loop guard | Trigger → condition → action rules; scheduled date-passed sweep with per-item-per-day dedupe |
+| Agent access | MCP stdio server (`src/Tuesday.Mcp`) with four tools and a Claude Code skill |
 | Integrations | Signed webhooks with challenge handshake, REST API with cursor pagination, idempotency keys, per-token quota and a committed OpenAPI snapshot |
 | Dashboard | Per-board counts, by-status and by-group breakdown, automation run history |
 | Ops | `/health/live`, `/health/ready`, correlation ids, security headers, Docker image, Compose stack |

@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\src\Tuesday.Domain\Tuesday.Domain.csproj" />
     <ProjectReference Include="..\..\src\Tuesday.Application\Tuesday.Application.csproj" />
     <ProjectReference Include="..\..\src\Tuesday.Infrastructure\Tuesday.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Tuesday.Mcp\Tuesday.Mcp.csproj" />
   </ItemGroup>
 
 </Project>

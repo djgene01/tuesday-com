@@ -225,6 +225,22 @@ environment, and the app fails at start-up rather than at first use when one is 
 
 ---
 
+## Use it from Claude Code
+
+The repository ships a Model Context Protocol server, so an agent can read boards, add items and
+comment without a browser:
+
+```bash
+dotnet build Tuesday.slnx -c Release
+export TUESDAY_API_TOKEN=tue_...        # Settings -> API tokens
+claude                                  # /mcp lists "tuesday" with four tools
+```
+
+`.mcp.json` is already wired to `src/Tuesday.Mcp`. Tools: `tuesday_list_boards`,
+`tuesday_list_items` (cursor-paged), `tuesday_create_item`, `tuesday_post_update`. The server is a
+client of the public API — the token's tenant and role decide what it can see. A matching skill lives
+at `.claude/skills/tuesday-mcp/SKILL.md`, and `docs/MCP.md` has the protocol and the limits.
+
 ## Testing
 
 ```bash

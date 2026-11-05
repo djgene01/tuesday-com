@@ -552,6 +552,58 @@ app.MapGet("/api/v1/boards/{boardId:guid}/items", async (
     });
 }).RequireRateLimiting("api");
 
+app.MapPost("/api/v1/boards/{boardId:guid}/items", async (
+    Guid boardId,
+    HttpContext http,
+    Tuesday.Infrastructure.Automations.ApiTokenService tokens,
+    Tuesday.Application.Tenancy.ITenantContext tenant,
+    Tuesday.Infrastructure.Queries.WorkspaceQueries boards,
+    Tuesday.Infrastructure.Boards.ItemEditor editor,
+    Tuesday.Infrastructure.Persistence.TuesdayDbContext dbContext,
+    Tuesday.Web.Api.CreateItemRequest request,
+    CancellationToken cancellationToken) =>
+{
+    var identity = await CallerAsync(http, tokens, cancellationToken);
+
+    if (identity is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var (userId, tenantId, role) = identity.Value;
+    ((Tuesday.Application.Tenancy.ITenantContextSetter)tenant).Resolve(tenantId, userId, role);
+
+    if (await boards.FindBoardAsync(boardId, userId, role, cancellationToken) is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (string.IsNullOrWhiteSpace(request.Name))
+    {
+        return Results.BadRequest(new { error = "An item needs a name." });
+    }
+
+    // Omitting the group is the common case for an agent: put the item in the first group.
+    var groupId = request.GroupId ?? await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
+        .FirstOrDefaultAsync(
+            dbContext.ItemGroups
+                .Where(group => group.BoardId == boardId)
+                .OrderBy(group => group.Position)
+                .Select(group => (Guid?)group.Id),
+            cancellationToken);
+
+    if (groupId is null)
+    {
+        return Results.BadRequest(new { error = "The board has no groups to add an item to." });
+    }
+
+    var write = await editor.AddAsync(boardId, groupId.Value, request.Name.Trim(), null, cancellationToken);
+
+    return write.Succeeded && write.ItemId is { } itemId
+        ? Results.Created($"/api/v1/boards/{boardId:D}/items/{itemId:D}", new { id = itemId, name = request.Name.Trim(), groupId })
+        : Results.BadRequest(new { error = write.Error ?? "The item was refused." });
+}).RequireRateLimiting("api");
+
 app.MapPost("/api/v1/boards/{boardId:guid}/items/{itemId:guid}/updates", async (
     Guid boardId,
     Guid itemId,

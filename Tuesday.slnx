@@ -4,6 +4,7 @@
     <Project Path="src/Tuesday.Contracts/Tuesday.Contracts.csproj" />
     <Project Path="src/Tuesday.Domain/Tuesday.Domain.csproj" />
     <Project Path="src/Tuesday.Infrastructure/Tuesday.Infrastructure.csproj" />
+    <Project Path="src/Tuesday.Mcp/Tuesday.Mcp.csproj" />
     <Project Path="src/Tuesday.Web/Tuesday.Web.csproj" />
     <Project Path="src/Tuesday.Worker/Tuesday.Worker.csproj" />
   </Folder>
