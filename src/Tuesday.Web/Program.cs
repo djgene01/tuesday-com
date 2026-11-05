@@ -626,16 +626,43 @@ static async Task ApplyMigrationsAndSeedAsync(WebApplication app)
     var services = scope.ServiceProvider;
 
     var dbContext = services.GetRequiredService<TuesdayDbContext>();
-    await dbContext.Database.MigrateAsync().ConfigureAwait(false);
 
-    var password = app.Configuration["Seed:AdminPassword"] ?? "Tuesday!Demo1";
-    var seeder = services.GetRequiredService<DevelopmentSeeder>();
-    await seeder.SeedAsync(password).ConfigureAwait(false);
+    // Two hosts starting at once (a second replica, or parallel test hosts) would otherwise
+    // both try to create the same tables and insert the same seed rows. A session-scoped
+    // advisory lock serialises start-up work; the id is arbitrary but must be stable.
+    const string lockSql = "SELECT pg_advisory_lock(4_281_977_001)";
+    const string unlockSql = "SELECT pg_advisory_unlock(4_281_977_001)";
 
-    // The OAuth client lives in the same database as the users it authenticates.
-    await Tuesday.Web.Security.IdentityServerSetup
-        .SeedClientsAsync(app.Services, app.Configuration)
-        .ConfigureAwait(false);
+    await dbContext.Database.OpenConnectionAsync().ConfigureAwait(false);
+
+    try
+    {
+        await dbContext.Database.ExecuteSqlRawAsync(lockSql).ConfigureAwait(false);
+
+        await dbContext.Database.MigrateAsync().ConfigureAwait(false);
+
+        var password = app.Configuration["Seed:AdminPassword"] ?? "Tuesday!Demo1";
+        var seeder = services.GetRequiredService<DevelopmentSeeder>();
+        await seeder.SeedAsync(password).ConfigureAwait(false);
+
+        // The OAuth client lives in the same database as the users it authenticates.
+        await Tuesday.Web.Security.IdentityServerSetup
+            .SeedClientsAsync(app.Services, app.Configuration)
+            .ConfigureAwait(false);
+    }
+    finally
+    {
+        try
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(unlockSql).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // The connection closing releases the lock anyway.
+        }
+
+        await dbContext.Database.CloseConnectionAsync().ConfigureAwait(false);
+    }
 }
 
 
