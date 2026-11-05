@@ -13,6 +13,9 @@
 @inject Microsoft.AspNetCore.Identity.UserManager<ApplicationUser> Users
 @inject Tuesday.Infrastructure.Persistence.TuesdayDbContext Db
 @inject ILogger<Workspace> Logger
+@inject Tuesday.Application.Collaboration.IEmailSender Email
+@inject Microsoft.Extensions.Options.IOptions<Tuesday.Application.Collaboration.EmailOptions> EmailOptions
+@inject Microsoft.AspNetCore.Components.NavigationManager Nav
 
 <PageTitle>Workspace — Tuesday.com</PageTitle>
 
@@ -33,7 +36,7 @@
 
     @if (_notice is not null)
     {
-        <p class="mb-4 rounded-md border border-status-done/30 bg-status-done/10 px-3 py-2 text-sm text-[#007a4d]" role="status">@_notice</p>
+        <p class="mb-4 break-words rounded-md border border-status-done/30 bg-status-done/10 px-3 py-2 text-sm text-[#007a4d]" role="status">@_notice</p>
     }
 
     @if (_error is not null)
@@ -229,7 +232,7 @@
             return;
         }
 
-        var email = Invite.Email.Trim();
+        var email = Invite.Email.Trim().ToLowerInvariant();
         var user = await Users.FindByEmailAsync(email);
 
         if (user is null)
@@ -242,7 +245,10 @@
                 DisplayName = email.Split('@')[0]
             };
 
-            var created = await Users.CreateAsync(user, "Tuesday!Demo1");
+            // A password nobody knows, replaced when the invitation is accepted. The account is
+            // created now so the membership and the audit trail point at a real user id.
+            var placeholder = Guid.NewGuid().ToString("N") + "!Aa1";
+            var created = await Users.CreateAsync(user, placeholder);
             if (!created.Succeeded)
             {
                 _error = string.Join("; ", created.Errors.Select(error => error.Description));
@@ -264,8 +270,24 @@
 
         await Db.SaveChangesAsync();
 
+        var (invitation, token) = Tuesday.Domain.Tenancy.Invite.Create(tenantId, email, Invite.Role, actorId);
+        Db.Invites.Add(invitation);
+        await Db.SaveChangesAsync();
+
+        var link = $"{Nav.BaseUri}invite/{token}";
+
+        await Email.SendAsync(
+            email,
+            "You're invited to Tuesday.com",
+            $"<p>Set your password to join: <a href=\"{link}\">{link}</a></p><p>The link works once and expires in "
+            + $"{Tuesday.Domain.Tenancy.Invite.LifetimeDays} days.</p>");
+
         Logger.LogInformation("Invited {Email} as {Role}.", email, Invite.Role);
-        _notice = $"{email} added as {Invite.Role}. Temporary password: Tuesday!Demo1";
+
+        _notice = EmailOptions.Value.Enabled
+            ? $"{email} added as {Invite.Role}. Invitation emailed."
+            : $"{email} added as {Invite.Role}. Share this one-time link: {link}";
+
         Invite = new();
     }
 

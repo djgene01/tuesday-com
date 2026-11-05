@@ -69,6 +69,8 @@ public sealed class TuesdayDbContext(
 
     public DbSet<AutomationRun> AutomationRuns => Set<AutomationRun>();
 
+    public DbSet<Invite> Invites => Set<Invite>();
+
     public DbSet<Tuesday.Domain.Automation.AutomationStep> AutomationSteps => Set<Tuesday.Domain.Automation.AutomationStep>();
 
     public DbSet<Webhook> Webhooks => Set<Webhook>();
@@ -360,6 +362,16 @@ public sealed class TuesdayDbContext(
             entity.HasKey(x => x.Id);
             entity.Property(x => x.ActionValue).HasMaxLength(500).IsRequired();
             entity.HasIndex(x => new { x.AutomationId, x.Position }).IsUnique();
+        });
+
+        builder.Entity<Invite>(entity =>
+        {
+            entity.ToTable("invites");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Email).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.TokenHash).HasMaxLength(64).IsRequired();
+            entity.HasIndex(x => x.TokenHash).IsUnique();
+            entity.HasIndex(x => new { x.TenantId, x.Email });
         });
 
         builder.Entity<AutomationRun>(entity =>

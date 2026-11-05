@@ -1,0 +1,158 @@
+@page "/invite/{Token}"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using Tuesday.Infrastructure.Identity
+@using Microsoft.EntityFrameworkCore
+@using Tuesday.Domain.Tenancy
+@using Tuesday.Infrastructure.Persistence
+@attribute [AllowAnonymous]
+@inject TuesdayDbContext Db
+@inject UserManager<ApplicationUser> Users
+
+<PageTitle>Accept your invitation — Tuesday.com</PageTitle>
+
+@{
+    var state = _done ? "done" : _error is null ? (_invite is null ? "invalid" : "form") : "error";
+}
+
+<main class="mx-auto max-w-[440px] py-10">
+    <div class="ui-card p-6">
+        @if (state == "done")
+        {
+            <h1 class="font-display text-[22px] font-semibold tracking-tight text-ink">You're in</h1>
+            <p class="mt-2 text-sm text-ink-soft">
+                Your password is set. Sign in with <span class="font-medium text-ink">@_invite?.Email</span>.
+            </p>
+            <a class="ui-btn-primary mt-5 !h-10 !px-5" href="/login">Sign in</a>
+        }
+        else if (_invite is null || state == "invalid")
+        {
+            <h1 class="font-display text-[22px] font-semibold tracking-tight text-ink">Invitation not valid</h1>
+            <p class="mt-2 text-sm text-ink-soft">
+                This link has already been used, has expired, or was never issued. Ask an administrator
+                for a new invitation.
+            </p>
+            <a class="ui-btn-ghost mt-5 !h-10 !px-5" href="/login">Back to sign in</a>
+        }
+        else
+        {
+            <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-ink">Invitation</p>
+            <h1 class="mt-1 font-display text-[22px] font-semibold tracking-tight text-ink">Choose a password</h1>
+            <p class="mt-2 text-sm text-ink-soft">
+                For <span class="font-medium text-ink">@_invite.Email</span>. The link works once and expires
+                @_invite.ExpiresAt.ToLocalTime().ToString("dd MMM yyyy").
+            </p>
+
+            <EditForm Model="Input" FormName="accept-invite" OnValidSubmit="AcceptAsync" class="mt-5 space-y-4">
+                <DataAnnotationsValidator />
+
+                <label class="block">
+                    <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Password</span>
+                    <InputText type="password" @bind-Value="Input.Password" autocomplete="new-password" required
+                               class="h-10 w-full rounded-control border border-line-strong bg-surface px-3 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20" />
+                    <ValidationMessage For="() => Input.Password" class="mt-1 block text-xs text-status-stuck" />
+                </label>
+
+                <label class="block">
+                    <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Confirm password</span>
+                    <InputText type="password" @bind-Value="Input.Confirm" autocomplete="new-password" required
+                               class="h-10 w-full rounded-control border border-line-strong bg-surface px-3 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20" />
+                    <ValidationMessage For="() => Input.Confirm" class="mt-1 block text-xs text-status-stuck" />
+                </label>
+
+                <p class="text-[11px] leading-relaxed text-ink-faint">
+                    At least 8 characters, with an uppercase letter, a lowercase letter, a digit and a symbol.
+                </p>
+
+                @if (_error is not null)
+                {
+                    <p class="text-xs font-medium text-status-stuck" role="alert">@_error</p>
+                }
+
+                <button type="submit" class="ui-btn-primary !h-10 w-full">Set password</button>
+            </EditForm>
+        }
+    </div>
+</main>
+
+@code {
+    [Parameter]
+    public string Token { get; set; } = string.Empty;
+
+    private Invite? _invite;
+    private ApplicationUser? _user;
+    private string? _error;
+    private bool _done;
+
+    public InputModel Input { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!InviteToken.LooksWellFormed(Token))
+        {
+            return;
+        }
+
+        var hash = InviteToken.HashOf(Token);
+
+        // The page runs before a tenant is resolved, so the filter is bypassed deliberately:
+        // possession of the token is the authorisation.
+        _invite = await Db.Invites.IgnoreQueryFilters().FirstOrDefaultAsync(invite => invite.TokenHash == hash);
+
+        if (_invite is null || !_invite.IsUsable())
+        {
+            _invite = null;
+            return;
+        }
+
+        _user = await Users.FindByEmailAsync(_invite.Email);
+
+        if (_user is null)
+        {
+            _invite = null;
+        }
+    }
+
+    private async Task AcceptAsync()
+    {
+        if (_invite is null || _user is null)
+        {
+            return;
+        }
+
+        _error = null;
+
+        // The account was created at invite time with a password nobody knows; replace it.
+        await Users.RemovePasswordAsync(_user);
+        var added = await Users.AddPasswordAsync(_user, Input.Password);
+
+        if (!added.Succeeded)
+        {
+            await Users.AddPasswordAsync(_user, Guid.NewGuid().ToString("N") + "!Aa1");
+            _error = string.Join(" ", added.Errors.Select(error => error.Description));
+            return;
+        }
+
+        if (!_invite.Accept(_user.Id))
+        {
+            _error = "This invitation was already used. Ask an administrator for a new one.";
+            return;
+        }
+
+        await Db.SaveChangesAsync();
+        _done = true;
+    }
+
+    public sealed class InputModel
+    {
+        [Required]
+        [MinLength(8, ErrorMessage = "Use at least 8 characters.")]
+        public string Password { get; set; } = string.Empty;
+
+        [Required]
+        [Compare(nameof(Password), ErrorMessage = "The two passwords do not match.")]
+        public string Confirm { get; set; } = string.Empty;
+    }
+}

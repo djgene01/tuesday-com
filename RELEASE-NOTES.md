@@ -14,8 +14,9 @@ Changes since 0.9.2:
 - **Automation chains**: ordered multi-action rules with a depth-3 `LoopPrevented` guard.
 - **MCP server**: `src/Tuesday.Mcp`, four tools over stdio, plus a Claude Code skill.
 - `libgssapi-krb5-2` in the runtime image; the Kerberos load warning is gone.
-- Known gap found in this pass: invited people are created with the shared demo password
-  (P6-18).
+- **Invitations**: a single-use `tue_inv_` link, stored only as a hash, expiring in 7 days. The
+  invitee chooses their own password at `/invite/{token}`; when email is disabled the admin sees the
+  link once. The shared `Tuesday!Demo1` literal is gone from the invite path (P6-18 closed).
 
 This build exists so the team has a real, installable system to work from while the UI/UX pass
 begins. It is feature-complete for the core loop — boards, views, collaboration, automations,
