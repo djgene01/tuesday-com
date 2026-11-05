@@ -1,35 +1,114 @@
 @inherits LayoutComponentBase
+@inject NavigationManager Nav
 
-<div class="app">
-    <header class="topbar">
-        <a class="brand" href="/">Tuesday<span class="dot">.</span>com</a>
+@*
+    Shell: monday.com's chrome. A narrow fixed icon rail on the left, a white 48px top bar,
+    and content on a soft grey canvas. Colour is reserved for the active rail item, the
+    primary action and the board statuses — everything else stays neutral so the data reads.
+*@
 
-        <nav class="topnav" aria-label="Main">
-            <AuthorizeView>
-                <Authorized>
-                    <a href="/workspace">Workspace</a>
-                    <a href="/search">Search</a>
-                    <a href="/notifications">Notifications</a>
-                    <a href="/account/tokens">API tokens</a>
-                    <a href="/account/security">Security</a>
-                    <span class="who">@context.User.Identity?.Name</span>
+<div class="min-h-screen bg-canvas font-sans text-ink antialiased">
+
+    <aside class="fixed inset-y-0 left-0 z-30 flex w-14 flex-col items-center border-r border-line bg-surface py-3"
+           aria-label="Primary">
+        <a href="/" class="mb-4 grid h-8 w-8 place-items-center rounded-lg bg-brand text-sm font-bold text-white font-display"
+           aria-label="Tuesday.com home">T</a>
+
+        <AuthorizeView>
+            <Authorized>
+                <nav class="flex flex-col items-center gap-1" aria-label="Workspace">
+                    <NavLink class="@RailLink" ActiveClass="@RailLinkActive" href="/workspace" aria-label="Workspace">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 10.5 12 3l9 7.5M5 9.5V21h14V9.5" />
+                        </svg>
+                    </NavLink>
+                    <NavLink class="@RailLink" ActiveClass="@RailLinkActive" href="/search" aria-label="Search">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                            <circle cx="11" cy="11" r="7" /><path stroke-linecap="round" d="m20 20-3.5-3.5" />
+                        </svg>
+                    </NavLink>
+                    <NavLink class="@RailLink" ActiveClass="@RailLinkActive" href="/notifications" aria-label="Notifications">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M18 8a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7M10.3 20a2 2 0 0 0 3.4 0" />
+                        </svg>
+                    </NavLink>
+                    <NavLink class="@RailLink" ActiveClass="@RailLinkActive" href="/account/tokens" aria-label="API tokens">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                            <circle cx="8" cy="15" r="4" /><path stroke-linecap="round" d="m11 12 9-9m-3 0h3v3" />
+                        </svg>
+                    </NavLink>
+                    <NavLink class="@RailLink" ActiveClass="@RailLinkActive" href="/account/security" aria-label="Security">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3Z" />
+                        </svg>
+                    </NavLink>
+                </nav>
+
+                <div class="mt-auto flex flex-col items-center gap-2">
+                    <span class="grid h-8 w-8 place-items-center rounded-full bg-brand-tint text-xs font-semibold text-brand-ink"
+                          title="@context.User.Identity?.Name">@Initials(context.User.Identity?.Name)</span>
                     <form method="post" action="/logout" class="inline-form">
                         <AntiforgeryToken />
-                        <button type="submit" class="link-button">Sign out</button>
+                        <button type="submit" class="@RailLink hover:text-status-stuck" aria-label="Sign out" title="Sign out">
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 17l5-5-5-5M20 12H9M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6" />
+                            </svg>
+                        </button>
                     </form>
+                </div>
+            </Authorized>
+            <NotAuthorized>
+                <div class="mt-auto">
+                    <a href="/login" class="ui-btn-primary !px-3 !py-1.5 text-xs">Sign in</a>
+                </div>
+            </NotAuthorized>
+        </AuthorizeView>
+    </aside>
+
+    <div class="pl-14">
+        <header class="sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-line bg-surface px-5">
+            <a class="font-display text-[15px] font-semibold tracking-tight text-ink" href="/">
+                Tuesday<span class="text-brand">.</span>com
+            </a>
+            <span class="h-4 w-px bg-line" aria-hidden="true"></span>
+            <AuthorizeView>
+                <Authorized>
+                    <span class="truncate text-xs text-ink-soft">@context.User.Identity?.Name</span>
                 </Authorized>
                 <NotAuthorized>
-                    <a href="/login">Sign in</a>
+                    <span class="text-xs text-ink-soft">Work operating system</span>
                 </NotAuthorized>
             </AuthorizeView>
-        </nav>
-    </header>
+        </header>
 
-    <div class="app-body">
-        @Body
+        <div class="px-5 py-5">
+            @Body
+        </div>
     </div>
 </div>
 
-<div id="blazor-error-ui" role="alert">
-    Something went wrong. <a href=".">Reload</a>
+<div id="blazor-error-ui" role="alert" class="fixed inset-x-0 bottom-0 z-50 hidden bg-status-stuck px-4 py-2 text-sm text-white">
+    Something went wrong. <a class="underline" href=".">Reload</a>
 </div>
+
+@code {
+    private const string RailLink =
+        "grid h-9 w-9 place-items-center rounded-lg text-ink-faint transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
+
+    private const string RailLinkActive = "bg-brand-tint text-brand-ink";
+
+    private static string Initials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "?";
+        }
+
+        var local = name.Split('@')[0];
+        var parts = local.Split(['.', '_', '-'], StringSplitOptions.RemoveEmptyEntries);
+
+        return parts.Length >= 2
+            ? string.Concat(char.ToUpperInvariant(parts[0][0]), char.ToUpperInvariant(parts[1][0]))
+            : local[..Math.Min(2, local.Length)].ToUpperInvariant();
+    }
+}

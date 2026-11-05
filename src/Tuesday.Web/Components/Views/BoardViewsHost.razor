@@ -13,20 +13,20 @@
 @inject TenantContextBootstrapper Bootstrapper
 @inject NavigationManager Navigation
 
-<div class="view-tabs" role="tablist" aria-label="Board views">
+<div class="mb-3 flex items-end gap-1 overflow-x-auto border-b border-line" role="tablist" aria-label="Board views">
     @foreach (var view in _views)
     {
         var current = view.Id == _activeId;
         <button type="button"
                 role="tab"
-                class="view-tab @(current ? "is-active" : null)"
+                class="group -mb-px flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-[13px] transition-colors @(current ? "border-brand font-semibold text-ink" : "border-transparent text-ink-soft hover:border-line-strong hover:text-ink")"
                 aria-selected="@(current ? "true" : "false")"
                 @onclick="() => SelectAsync(view.Id)">
-            <span class="view-tab-name">@view.Name</span>
-            <span class="view-tab-kind">@Kind(view.Type)</span>
+            <span>@view.Name</span>
+            <span class="rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-medium text-ink-faint group-hover:text-ink-soft">@Kind(view.Type)</span>
         </button>
     }
-    <p class="meta view-count">@_views.Count of @BoardView.MaxViewsPerBoard views</p>
+    <p class="ml-auto pb-2 text-[11px] text-ink-faint">@_views.Count of @BoardView.MaxViewsPerBoard views</p>
 </div>
 
 @if (_error is not null)

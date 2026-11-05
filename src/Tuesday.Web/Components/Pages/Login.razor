@@ -1,4 +1,5 @@
 @page "/login"
+@layout EmptyLayout
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Identity
 @using Tuesday.Infrastructure.Identity
@@ -8,53 +9,69 @@
 
 <PageTitle>Sign in — Tuesday.com</PageTitle>
 
-<main class="auth-shell">
-    <section class="auth-card">
-        <p class="eyebrow">Tuesday.com</p>
-        <h1>Sign in</h1>
-        <p class="lede">Use your work account. Access is scoped to your tenant and role.</p>
+<main class="flex min-h-screen items-center justify-center bg-canvas px-4 py-10 font-sans">
+    <section class="w-full max-w-[400px]">
+        <div class="mb-6 flex items-center justify-center gap-2">
+            <span class="grid h-9 w-9 place-items-center rounded-lg bg-brand font-display text-base font-bold text-white">T</span>
+            <span class="font-display text-lg font-semibold tracking-tight text-ink">Tuesday<span class="text-brand">.</span>com</span>
+        </div>
 
-        @if (_error is not null)
-        {
-            <p class="alert alert-bad" role="alert">@_error</p>
-        }
+        <div class="rounded-xl border border-line bg-surface p-7 shadow-card">
+            <h1 class="font-display text-[22px] font-semibold tracking-tight text-ink">
+                @(_requiresTwoFactor ? "Two-step verification" : "Sign in")
+            </h1>
+            <p class="mt-1 text-sm text-ink-soft">
+                @(_requiresTwoFactor
+                    ? "Enter the six-digit code from your authenticator app."
+                    : "Use your work account. Access is scoped to your tenant and role.")
+            </p>
 
-        @if (!_requiresTwoFactor)
-        {
-            <EditForm Model="Credentials" FormName="login" method="post" OnValidSubmit="SignInAsync">
-                <DataAnnotationsValidator />
+            @if (_error is not null)
+            {
+                <p class="mt-4 rounded-md border border-status-stuck/30 bg-status-stuck/10 px-3 py-2 text-sm text-status-stuck" role="alert">@_error</p>
+            }
 
-                <label class="field">
-                    <span>Email</span>
-                    <InputText @bind-Value="Credentials.Email" type="email" autocomplete="username" required />
-                </label>
+            @if (!_requiresTwoFactor)
+            {
+                <EditForm Model="Credentials" FormName="login" method="post" OnValidSubmit="SignInAsync" class="mt-5 space-y-4">
+                    <DataAnnotationsValidator />
 
-                <label class="field">
-                    <span>Password</span>
-                    <InputText @bind-Value="Credentials.Password" type="password" autocomplete="current-password" required />
-                </label>
+                    <label class="block">
+                        <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Email</span>
+                        <InputText @bind-Value="Credentials.Email" type="email" autocomplete="username" required
+                                   class="h-10 w-full rounded-control border border-line-strong bg-surface px-3 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20" />
+                    </label>
 
-                <button type="submit" class="btn-primary">Sign in</button>
-            </EditForm>
-        }
-        else
-        {
-            @* A plain form: the code is submitted once to its own endpoint, which never
-               renders it back. EditForm is not used for this step. *@
-            <form method="post" action="/login/totp" name="totp">
-                <AntiforgeryToken />
-                <p class="meta">Enter the six-digit code from your authenticator app.</p>
+                    <label class="block">
+                        <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Password</span>
+                        <InputText @bind-Value="Credentials.Password" type="password" autocomplete="current-password" required
+                                   class="h-10 w-full rounded-control border border-line-strong bg-surface px-3 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20" />
+                    </label>
 
-                <label class="field">
-                    <span>Authenticator code</span>
-                    <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required />
-                </label>
+                    <button type="submit" class="ui-btn-primary mt-1 h-10 w-full text-sm">Sign in</button>
+                </EditForm>
+            }
+            else
+            {
+                @* A plain form: the code is submitted once to its own endpoint, which never
+                   renders it back. EditForm is not used for this step. *@
+                <form method="post" action="/login/totp" name="totp" class="mt-5 space-y-4">
+                    <AntiforgeryToken />
 
-                <button type="submit" class="btn-primary">Verify</button>
-            </form>
-        }
+                    <label class="block">
+                        <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Authenticator code</span>
+                        <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required
+                               class="h-11 w-full rounded-control border border-line-strong bg-surface px-3 text-center text-lg tracking-[0.3em] text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20" />
+                    </label>
 
-        <p class="meta">Development accounts: admin@@, member@@, viewer@@, guest@@tuesday.local — password <code>Tuesday!Demo1</code>.</p>
+                    <button type="submit" class="ui-btn-primary h-10 w-full text-sm">Verify</button>
+                </form>
+            }
+        </div>
+
+        <p class="mt-4 text-center text-[11px] leading-relaxed text-ink-faint">
+            Development accounts: admin@@, member@@, viewer@@, guest@@tuesday.local — password <code class="rounded bg-canvas px-1 py-0.5 text-ink-soft">Tuesday!Demo1</code>.
+        </p>
     </section>
 </main>
 

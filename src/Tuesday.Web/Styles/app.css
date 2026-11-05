@@ -1,0 +1,98 @@
+/*
+ * Tuesday.com — Tailwind v4 source.
+ *
+ * Base style: Tailwind utilities. The design language is monday.com's: a violet primary,
+ * Poppins display type, pill-shaped actions, a compact data grid with solid colour status
+ * cells and a purple-underline view bar.
+ *
+ * No preflight is imported on purpose. The app still ships its long-standing semantic
+ * stylesheet (app.css) for forms and secondary pages; pulling in Tailwind's reset would
+ * silently change margins on every one of them. Utilities and tokens only.
+ */
+
+/*
+ * Imported UNLAYERED on purpose. The app's existing stylesheet is unlayered, and an
+ * unlayered rule always beats a layered one — with Tailwind's default layers, `a { color }`
+ * in app.css overrode `.ui-btn-primary { color: white }` and every primary button rendered
+ * invisible. Unlayered utilities loaded after app.css win on source order instead.
+ */
+@import "tailwindcss/theme.css";
+@import "tailwindcss/utilities.css";
+
+@source "../Components/**/*.razor";
+@source "../Components/**/*.cs";
+
+@theme {
+  /* Brand */
+  --color-brand: #6161ff;
+  --color-brand-hover: #5151d5;
+  --color-brand-press: #4747bb;
+  --color-brand-tint: #ececff;
+  --color-brand-ink: #3b3bbd;
+
+  /* Neutrals — monday's in-product greys */
+  --color-ink: #323338;
+  --color-ink-soft: #676879;
+  --color-ink-faint: #6b6f80;
+  --color-line: #e6e9ef;
+  --color-line-strong: #d0d4e4;
+  --color-canvas: #f6f7fb;
+  --color-surface: #ffffff;
+
+  /* Status palette */
+  --color-status-done: #00c875;
+  --color-status-working: #fdab3d;
+  --color-status-stuck: #c42b45;
+  --color-status-idle: #c4c4c4;
+  --color-status-review: #8e4bc4;
+  --color-status-info: #579bfc;
+
+  /* Type */
+  --font-display: "Poppins", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  /* Shape */
+  --radius-pill: 999px;
+  --radius-card: 10px;
+  --radius-control: 6px;
+
+  --shadow-card: 0 4px 12px rgb(29 33 57 / 0.08);
+  --shadow-pop: 0 12px 32px rgb(29 33 57 / 0.16);
+}
+
+/* --- Component layer: the pieces that repeat across boards ------------------------- */
+
+/* Components: plain rules, so they sit in the same unlayered cascade as the utilities. */
+  .ui-btn,
+  .ui-btn-primary,
+  .ui-btn-ghost,
+  .ui-btn-quiet {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-transparent
+           px-4 py-2 text-sm font-medium transition-colors duration-150;
+  }
+
+  .ui-btn-primary {
+    @apply bg-brand text-white hover:bg-brand-hover active:bg-brand-press;
+  }
+
+  .ui-btn-ghost {
+    @apply border-line bg-surface text-ink hover:bg-canvas;
+  }
+
+  .ui-btn-quiet {
+    @apply bg-transparent text-ink-soft hover:bg-canvas hover:text-ink;
+  }
+
+  .ui-card {
+    @apply rounded-[10px] border border-line bg-surface;
+  }
+
+  .ui-pill {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  /* Board group header: colour-tinted strip, like a board's group title bar. */
+  .ui-group-head {
+    @apply flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-ink;
+  }
+

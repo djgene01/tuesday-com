@@ -163,7 +163,19 @@ One deliberate choice worth naming: interactive circuits can run two handlers at
 | Realtime | **SignalR**, in-process broadcast | No broker needed for single-node deployment |
 | Cache | **Redis** | Read caching, and the backplane when a second replica lands |
 | Sanitising | **HtmlSanitizer** (MIT) | Allow-list, not block-list |
+| Styling | **Tailwind CSS v4** with a token layer (`@theme`) | One source of truth for colour, type and shape; no bespoke component CSS |
+| Type | **Poppins** + **Figtree**, self-hosted | Display and UI faces, served from `wwwroot/fonts` — no CDN call |
 | Packaging | **Docker** multi-stage, non-root, Compose | On-prem, Windows Server or Linux |
+
+### Design
+
+The interface follows monday.com's visual language — violet primary, soft grey canvas,
+pill actions, a compact grid with solid status cells. Whatever the inspiration, the
+assets are ours: a plain "T" mark, hand-written SVG icons, and open-licence fonts.
+
+![Board](docs/assets/design-board.png)
+
+Tokens, component rules and the accessibility table live in **[docs/DESIGN.md](docs/DESIGN.md)**.
 
 ---
 

@@ -1,0 +1,13 @@
+@inherits LayoutComponentBase
+
+@*
+    A bare layout for the sign-in flow. The app shell belongs to signed-in work; showing a
+    navigation rail and the signed-in identity on a login screen is confusing, and it lets a
+    stale cookie paint the wrong context behind the form.
+*@
+
+@Body
+
+<div id="blazor-error-ui" role="alert" class="fixed inset-x-0 bottom-0 z-50 hidden bg-status-stuck px-4 py-2 text-sm text-white">
+    Something went wrong. <a class="underline" href=".">Reload</a>
+</div>

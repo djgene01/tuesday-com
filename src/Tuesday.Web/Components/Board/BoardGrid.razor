@@ -9,89 +9,109 @@
 @inject Tuesday.Infrastructure.Automations.AutomationService Automations
 @inject TenantContextBootstrapper Bootstrapper
 
-<div class="grid-toolbar">
-    <p class="meta">
-        @if (_board is null)
-        {
-            <text>Loading…</text>
-        }
-        else
-        {
-            <text>@_board.ItemCount items · @_board.Columns.Count columns</text>
-            @if (_rows.Count < _totalRows)
-            {
-                <span class="meta-note">· @_rows.Count of @_totalRows rows shown</span>
-            }
-        }
-    </p>
-    @if (_error is not null)
-    {
-        <p class="alert alert-bad" role="alert">@_error</p>
-    }
-    else if (_savedAt is not null)
-    {
-        <p class="saved" role="status">Saved @_savedAt.Value.ToLocalTime().ToString("HH:mm:ss")</p>
-    }
-</div>
+@*
+    The grid carries monday.com's visual language: a white bordered card, a 34px row,
+    faint #E6E9EF rules, group headings tinted with the group's own colour, and statuses as
+    solid filled cells rather than text. Row virtualisation is unchanged — the flattened
+    group/item list is what Virtualize walks.
+*@
 
-@if (_board is { ItemCount: 0 } empty)
-{
-    @* An empty board should say what to do next, not show a header with no rows under it. *@
-    <div class="grid-empty-state">
-        <p class="grid-empty-title">No items yet</p>
-        <p class="grid-empty-body">
-            @if (empty.Columns.Count == 0)
+<div class="ui-card overflow-hidden">
+
+    <div class="flex h-10 items-center gap-3 border-b border-line px-3">
+        <p class="text-xs text-ink-soft">
+            @if (_board is null)
             {
-                <text>This board has no columns. Add columns first, then items can be filled in.</text>
+                <text>Loading…</text>
             }
             else
             {
-                <text>This board has @empty.Columns.Count column@(empty.Columns.Count == 1 ? "" : "s") but no items.</text>
+                <text>@_board.ItemCount items · @_board.Columns.Count columns</text>
+                @if (_rows.Count < _totalRows)
+                {
+                    <span class="text-ink-faint">· @_rows.Count of @_totalRows rows shown</span>
+                }
             }
         </p>
+
+        @if (_error is not null)
+        {
+            <p class="ml-auto text-xs font-medium text-status-stuck" role="alert">@_error</p>
+        }
+        else if (_savedAt is not null)
+        {
+            <p class="ml-auto text-xs text-ink-faint" role="status">Saved @_savedAt.Value.ToLocalTime().ToString("HH:mm:ss")</p>
+        }
     </div>
-}
-else if (_board is { } board)
-{
-    @* One table for the whole board: a single scroll area, one sticky header, and column
-       widths that agree across groups. Group titles are rows of that same table, which is
-       what makes a virtualised list possible without per-group scroll boxes. *@
-    <div class="grid-scroll grid-scroll-virtual">
-        <table class="grid">
-            <caption class="sr-only">@board.Name items by group</caption>
-            <thead>
-                <tr>
-                    <th class="col-open" scope="col"><span class="sr-only">Open</span></th>
-                    <th class="col-item" scope="col">Item</th>
-                    @foreach (var column in board.Columns)
-                    {
-                        <th scope="col">@column.Title</th>
-                    }
-                </tr>
-            </thead>
-            <tbody>
-                <Virtualize Items="_rows" Context="row" SpacerElement="tr" OverscanCount="8">
+
+    @if (_board is { ItemCount: 0 } empty)
+    {
+        @* An empty board should say what to do next, not show a header with no rows under it. *@
+        <div class="px-6 py-14 text-center">
+            <p class="font-display text-base font-semibold text-ink">No items yet</p>
+            <p class="mx-auto mt-1 max-w-md text-sm text-ink-soft">
+                @if (empty.Columns.Count == 0)
+                {
+                    <text>This board has no columns. Add columns first, then items can be filled in.</text>
+                }
+                else
+                {
+                    <text>This board has @empty.Columns.Count column@(empty.Columns.Count == 1 ? "" : "s") but no items.</text>
+                }
+            </p>
+        </div>
+    }
+    else if (_board is { } board)
+    {
+        @* One table for the whole board: a single scroll area, one sticky header, and column
+           widths that agree across groups. Group titles are rows of that same table, which is
+           what makes a virtualised list possible without per-group scroll boxes. *@
+        <div class="h-[min(72vh,780px)] overflow-auto">
+            <table class="w-full border-collapse text-[13px]">
+                <caption class="sr-only">@board.Name items by group</caption>
+                <thead class="sticky top-0 z-10 bg-surface">
+                    <tr class="border-b border-line text-[11px] font-medium uppercase tracking-[0.04em] text-ink-faint">
+                        <th class="w-10 py-2 pl-3" scope="col"><span class="sr-only">Open</span></th>
+                        <th class="min-w-[220px] py-2 text-left font-medium" scope="col">Item</th>
+                        @foreach (var column in board.Columns)
+                        {
+                            <th class="min-w-[140px] px-2 py-2 text-left font-medium" scope="col">
+                                <span class="flex items-center gap-1.5">
+                                    <span class="text-ink-faint/70" aria-hidden="true">@ColumnGlyph(column.Type)</span>
+                                    @column.Title
+                                </span>
+                            </th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    <Virtualize Items="_rows" Context="row" SpacerElement="tr" OverscanCount="8">
                         @if (row.Group is not null)
                         {
-                            <tr class="group-row" @key="row.Key">
-                                <td colspan="@(board.Columns.Count + 2)">
-                                    <span class="group-dot group-@row.Group.Colour" aria-hidden="true"></span>
-                                    <h2>@row.Group.Title</h2>
-                                    <span class="tag">@row.Group.Items.Count</span>
+                            <tr class="group-row" @key="RowKey(row)" style="--group: @GroupHex(row.Group.Colour)">
+                                <td colspan="@(board.Columns.Count + 2)"
+                                    class="border-b border-line px-3 py-2"
+                                    style="background: @Tint(row.Group.Colour)">
+                                    <div class="flex items-center gap-2">
+                                        <span class="h-3 w-1 shrink-0 rounded-full" style="background: var(--group)" aria-hidden="true"></span>
+                                        <h2 class="font-display text-[13px] font-semibold text-ink">@row.Group.Title</h2>
+                                        <span class="rounded-full bg-white/70 px-1.5 py-0.5 text-[10px] font-medium text-ink-soft">@row.Group.Items.Count</span>
+                                    </div>
                                 </td>
                             </tr>
                         }
                         else if (row.Item is not null)
                         {
-                            <tr @key="row.Key">
-                                <td class="col-open">
-                                    <a class="row-open" href="@($"/board/{BoardId}/item/{row.Item.Id}")"
+                            <tr @key="RowKey(row)" class="group border-b border-line/80 last:border-0 hover:bg-canvas/70">
+                                <td class="py-0 pl-3 align-middle">
+                                    <a class="row-open grid h-6 w-6 place-items-center rounded text-ink-faint opacity-0 transition hover:bg-brand-tint hover:text-brand-ink focus-visible:opacity-100 group-hover:opacity-100"
+                                       href="@($"/board/{BoardId}/item/{row.Item.Id}")"
                                        aria-label="@($"Open {row.Item.Name}")"><span aria-hidden="true">›</span></a>
                                 </td>
-                                <td class="col-item">
-                                    <input class="cell cell-item"
+                                <td class="py-0 align-middle">
+                                    <input class="h-[34px] w-full border-0 bg-transparent px-1 text-[13px] font-medium text-ink outline-none focus:bg-brand-tint/60 focus:ring-1 focus:ring-inset focus:ring-brand disabled:cursor-default"
                                            aria-label="Item name"
-                                           value="@NameInput(row.Item.Id)"
+                                           value="@ItemNameById(row.Item.Id)"
                                            disabled="@(!CanEdit)"
                                            @oninput="e => _pendingNames[row.Item.Id] = e.Value?.ToString()"
                                            @onchange="_ => SaveNameAsync(row.Item.Id)"
@@ -99,10 +119,10 @@ else if (_board is { } board)
                                 </td>
                                 @foreach (var column in board.Columns)
                                 {
-                                    <td>
+                                    <td class="py-0 align-middle">
                                         <input class="@CellClass(column, CellInput(row.Item.Id, column.Id))"
                                                aria-label="@($"{row.Item.Name}: {column.Title}")"
-                                               value="@CellInput(row.Item.Id, column.Id)"
+                                               value="@CellText(row.Item.Id, column.Id)"
                                                disabled="@(!CanEdit)"
                                                @oninput="e => _pendingCells[(row.Item.Id, column.Id)] = e.Value?.ToString()"
                                                @onchange="_ => SaveCellAsync(row.Item.Id, column.Id)"
@@ -111,11 +131,12 @@ else if (_board is { } board)
                                 }
                             </tr>
                         }
-                </Virtualize>
-            </tbody>
-        </table>
-    </div>
-}
+                    </Virtualize>
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
 
 @code {
     [Parameter]
@@ -142,6 +163,8 @@ else if (_board is { } board)
     // walks this instead of the model, so an item row and a group row can share a table.
     private List<GridRow> _rows = [];
     private int _totalRows;
+    // Bumped on revert so the rows are re-created and show their committed values again.
+    private int _revision;
 
     protected override async Task OnInitializedAsync()
     {
@@ -189,24 +212,76 @@ else if (_board is { } board)
     /// A cell's class follows its column type, so status, dates and numbers are visually
     /// distinguishable without reading every word. Status also takes a semantic tone.
     /// </summary>
-    private static string CellClass(ColumnView column, string? value) => column.Type switch
+    private static string CellClass(ColumnView column, string? value)
     {
-        ColumnType.Status => "cell cell-typed cell-status status-" + StatusTone(value),
-        ColumnType.Date => "cell cell-typed cell-date",
-        ColumnType.Number => "cell cell-typed cell-number",
-        ColumnType.People => "cell cell-typed cell-people",
-        ColumnType.Dropdown => "cell cell-typed cell-tag",
-        _ => "cell cell-typed"
+        // No background in the base class: a status carries its own fill, and a stray
+        // bg-transparent here would win the cascade and flatten every status to white.
+        const string baseCell =
+            "h-[34px] w-full border-0 px-2 text-[13px] outline-none focus:ring-1 focus:ring-inset focus:ring-brand disabled:cursor-default";
+
+        return column.Type switch
+        {
+            ColumnType.Status => baseCell + " " + StatusClass(value),
+            ColumnType.Date => baseCell + " bg-transparent tabular-nums text-ink-soft",
+            ColumnType.Number => baseCell + " bg-transparent text-right tabular-nums",
+            ColumnType.People => baseCell + " bg-transparent text-ink-soft",
+            ColumnType.Dropdown => baseCell + " bg-transparent text-ink-soft",
+            _ => baseCell + " bg-transparent"
+        };
+    }
+
+    /// <summary>
+    /// Statuses are solid fills, like a board's status column. Text is white on the darker
+    /// fills and ink on the amber one, because white on #FDAB3D is only 1.9:1.
+    /// </summary>
+    private static string StatusClass(string? value) => (value ?? string.Empty).Trim().ToLowerInvariant() switch
+    {
+        "done" => "mx-1 rounded-sm bg-status-done text-center font-medium text-ink",
+        "stuck" => "mx-1 rounded-sm bg-status-stuck text-center font-medium text-white",
+        "working on it" => "mx-1 rounded-sm bg-status-working text-center font-medium text-ink",
+        "not started" => "mx-1 rounded-sm bg-status-idle text-center font-medium text-ink",
+        "review" => "mx-1 rounded-sm bg-status-review text-center font-medium text-white",
+        _ => "mx-1 rounded-sm bg-status-info/15 text-center font-medium text-ink"
     };
 
-    private static string StatusTone(string? value) => (value ?? string.Empty).Trim().ToLowerInvariant() switch
+    /// <summary>The group's own colour, used for the heading bar. Unknown names fall back to blue.</summary>
+    private static string GroupHex(string colour) => colour switch
     {
-        "done" => "done",
-        "stuck" => "stuck",
-        "working on it" => "working",
-        "not started" => "idle",
-        _ => "neutral"
+        "amber" => "#FDAB3D",
+        "teal" => "#00C875",
+        "slate" => "#579BFC",
+        "violet" => "#A25DDC",
+        "rose" => "#E2445C",
+        _ => "#579BFC"
     };
+
+    /// <summary>A 6% wash of the group colour, so the heading reads as a band without shouting.</summary>
+    private static string Tint(string colour) => Blend(GroupHex(colour), 0.06m);
+
+    private static string Blend(string hex, decimal amount)
+    {
+        static int Channel(string h, int i) => Convert.ToInt32(h.Substring(1 + (i * 2), 2), 16);
+
+        var r = (int)Math.Round(Channel(hex, 0) * amount + 255 * (1 - amount));
+        var g = (int)Math.Round(Channel(hex, 1) * amount + 255 * (1 - amount));
+        var b = (int)Math.Round(Channel(hex, 2) * amount + 255 * (1 - amount));
+
+        return $"#{r:X2}{g:X2}{b:X2}";
+    }
+
+    /// <summary>A quiet type cue in the column header, the way a board shows column kinds.</summary>
+    private static string ColumnGlyph(ColumnType type) => type switch
+    {
+        ColumnType.Status => "◉",
+        ColumnType.Date => "▤",
+        ColumnType.Number => "#",
+        ColumnType.People => "☺",
+        ColumnType.Dropdown => "▾",
+        _ => "≡"
+    };
+
+    /// <summary>A stable key per row, plus the revert revision so a revert forces new DOM.</summary>
+    private string RowKey(GridRow row) => row.Key + ":" + _revision;
 
     private string? CellText(Guid itemId, Guid columnId) =>
         _cells.TryGetValue((itemId, columnId), out var value) ? value : null;
@@ -299,6 +374,7 @@ else if (_board is { } board)
         _names.Clear();
         _pendingCells.Clear();
         _pendingNames.Clear();
+        _revision++;
         await LoadAsync();
     }
 

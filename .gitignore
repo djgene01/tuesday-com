@@ -30,3 +30,6 @@ Thumbs.db
 keys/
 *.pfx
 *.pem
+
+# Tailwind toolchain
+node_modules/

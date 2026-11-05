@@ -22,15 +22,22 @@
 }
 else
 {
-    <main class="board-shell">
-        <p class="eyebrow">@_board.WorkspaceName · @_board.Type</p>
-        <div class="board-head">
-            <h1>@_board.Name</h1>
-            <a class="board-action" href="/board/@Id/dashboard">Dashboard</a>
+    <main class="mx-auto max-w-[1600px]">
+        <nav class="mb-1 flex items-center gap-1.5 text-xs text-ink-soft" aria-label="Breadcrumb">
+            <a class="hover:text-brand" href="/workspace">@_board.WorkspaceName</a>
+            <span aria-hidden="true">/</span>
+            <span class="text-ink-faint">@_board.Type</span>
+        </nav>
+
+        <div class="mb-4 flex flex-wrap items-center gap-3">
+            <h1 class="font-display text-[26px] font-semibold leading-tight tracking-tight text-ink">@_board.Name</h1>
             @if (!_board.CanEdit)
             {
-                <span class="tag tag-quiet">Read-only</span>
+                <span class="ui-pill border border-line bg-canvas text-ink-soft">Read-only</span>
             }
+            <a class="ui-btn-primary ml-auto !h-9 !px-4 text-[13px]" href="/board/@Id/dashboard">
+                Dashboard
+            </a>
         </div>
 
         <BoardViewsHost BoardId="Id" CanEdit="_board.CanEdit" @rendermode="InteractiveServer" />

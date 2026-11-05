@@ -16,72 +16,87 @@
 
 <PageTitle>Workspace — Tuesday.com</PageTitle>
 
-<main class="shell">
-    <p class="eyebrow">Workspace · @Tenant.Role</p>
-    <h1>Boards</h1>
-    <p class="lede">
-        @_boards.Count board@( _boards.Count == 1 ? "" : "s" ) visible to you.
-        @if (!CanCreate)
-        {
-            <text>Your role is read-only.</text>
-        }
-    </p>
+<main class="mx-auto max-w-[1200px]">
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">Workspace · @Tenant.Role</p>
+            <h1 class="mt-1 font-display text-[26px] font-semibold leading-tight tracking-tight text-ink">Boards</h1>
+            <p class="mt-1 text-sm text-ink-soft">
+                @_boards.Count board@( _boards.Count == 1 ? "" : "s" ) visible to you.
+                @if (!CanCreate)
+                {
+                    <text>Your role is read-only.</text>
+                }
+            </p>
+        </div>
+    </div>
 
     @if (_notice is not null)
     {
-        <p class="alert alert-ok" role="status">@_notice</p>
+        <p class="mb-4 rounded-md border border-status-done/30 bg-status-done/10 px-3 py-2 text-sm text-[#007a4d]" role="status">@_notice</p>
     }
 
     @if (_error is not null)
     {
-        <p class="alert alert-bad" role="alert">@_error</p>
+        <p class="mb-4 rounded-md border border-status-stuck/30 bg-status-stuck/10 px-3 py-2 text-sm text-status-stuck" role="alert">@_error</p>
     }
 
-    <section class="panel">
-        @if (_boards.Count == 0)
-        {
-            <p class="meta">No boards are shared with you yet.</p>
-        }
-        else
-        {
-            <ul class="board-list">
-                @foreach (var board in _boards)
-                {
-                    <li class="board-row">
-                        <a class="board-name" href="@($"/board/{board.Id}")">@board.Name</a>
-                        <span class="tag">@board.WorkspaceName</span>
-                        <span class="tag tag-quiet">@board.Type</span>
-                        @if (board.IsGranted)
-                        {
-                            <span class="tag tag-grant">Granted</span>
-                        }
-                    </li>
-                }
-            </ul>
-        }
-    </section>
+    @if (_boards.Count == 0)
+    {
+        <div class="ui-card px-6 py-12 text-center">
+            <p class="font-display text-base font-semibold text-ink">No boards yet</p>
+            <p class="mt-1 text-sm text-ink-soft">No boards are shared with you yet.</p>
+        </div>
+    }
+    else
+    {
+        <ul class="m-0 grid list-none gap-3 p-0 sm:grid-cols-2 lg:grid-cols-3">
+            @foreach (var board in _boards)
+            {
+                <li>
+                    <a class="group flex h-full flex-col gap-2 rounded-xl border border-line bg-surface p-4 text-ink no-underline transition hover:border-line-strong hover:shadow-card hover:no-underline"
+                       href="@($"/board/{board.Id}")">
+                        <span class="flex items-center gap-2">
+                            <span class="h-2.5 w-2.5 rounded-full bg-brand/70" aria-hidden="true"></span>
+                            <span class="font-display text-[15px] font-semibold text-ink group-hover:text-brand-ink">@board.Name</span>
+                        </span>
+                        <span class="flex flex-wrap items-center gap-1.5">
+                            <span class="ui-pill bg-canvas text-ink-soft">@board.WorkspaceName</span>
+                            <span class="ui-pill border border-line text-ink-soft">@board.Type</span>
+                            @if (board.IsGranted)
+                            {
+                                <span class="ui-pill bg-brand-tint text-brand-ink">Granted</span>
+                            }
+                        </span>
+                    </a>
+                </li>
+            }
+        </ul>
+    }
 
     @if (CanCreate)
     {
-        <section class="panel">
-            <h2>New board</h2>
-            <EditForm Model="NewBoard" FormName="create-board" method="post" OnValidSubmit="CreateBoardAsync">
+        <section class="ui-card mt-6 p-5">
+            <h2 class="font-display text-[15px] font-semibold text-ink">New board</h2>
+            <EditForm Model="NewBoard" FormName="create-board" method="post" OnValidSubmit="CreateBoardAsync" class="mt-3">
                 <DataAnnotationsValidator />
-                <div class="form-row">
-                    <label class="field">
-                        <span>Name</span>
-                        <InputText @bind-Value="NewBoard.Name" required />
+                <div class="flex flex-wrap items-end gap-3">
+                    <label class="block min-w-[220px] flex-1">
+                        <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Name</span>
+                        <InputText @bind-Value="NewBoard.Name" required
+                                   class="h-10 w-full rounded-control border border-line-strong bg-surface px-3 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20" />
                     </label>
-                    <label class="field">
-                        <span>Workspace</span>
-                        <InputSelect @bind-Value="NewBoard.WorkspaceId">
+                    <label class="block min-w-[180px]">
+                        <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Workspace</span>
+                        <InputSelect @bind-Value="NewBoard.WorkspaceId"
+                                     class="h-10 w-full rounded-control border border-line-strong bg-surface px-3 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20">
                             @foreach (var workspace in _workspaces)
                             {
                                 <option value="@workspace.Id">@workspace.Name</option>
                             }
                         </InputSelect>
                     </label>
-                    <button type="submit" class="btn-primary">Create</button>
+                    <button type="submit" class="ui-btn-primary h-10">Create</button>
                 </div>
             </EditForm>
         </section>
@@ -89,24 +104,26 @@
 
     @if (CanManageMembers)
     {
-        <section class="panel">
-            <h2>Invite someone</h2>
-            <EditForm Model="Invite" FormName="invite" method="post" OnValidSubmit="InviteAsync">
+        <section class="ui-card mt-6 p-5">
+            <h2 class="font-display text-[15px] font-semibold text-ink">Invite someone</h2>
+            <EditForm Model="Invite" FormName="invite" method="post" OnValidSubmit="InviteAsync" class="mt-3">
                 <DataAnnotationsValidator />
-                <div class="form-row">
-                    <label class="field">
-                        <span>Email</span>
-                        <InputText @bind-Value="Invite.Email" type="email" required />
+                <div class="flex flex-wrap items-end gap-3">
+                    <label class="block min-w-[220px] flex-1">
+                        <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Email</span>
+                        <InputText @bind-Value="Invite.Email" type="email" required
+                                   class="h-10 w-full rounded-control border border-line-strong bg-surface px-3 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20" />
                     </label>
-                    <label class="field">
-                        <span>Role</span>
-                        <InputSelect @bind-Value="Invite.Role">
+                    <label class="block min-w-[150px]">
+                        <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Role</span>
+                        <InputSelect @bind-Value="Invite.Role"
+                                     class="h-10 w-full rounded-control border border-line-strong bg-surface px-3 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20">
                             <option value="@TenantRole.Member">Member</option>
                             <option value="@TenantRole.Viewer">Viewer</option>
                             <option value="@TenantRole.Guest">Guest</option>
                         </InputSelect>
                     </label>
-                    <button type="submit" class="btn-primary">Invite</button>
+                    <button type="submit" class="ui-btn-primary h-10">Invite</button>
                 </div>
             </EditForm>
         </section>

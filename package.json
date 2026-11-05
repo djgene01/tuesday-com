@@ -1,0 +1,14 @@
+{
+  "name": "tuesday-com-ui",
+  "private": true,
+  "version": "0.9.0",
+  "description": "Tailwind build for the Tuesday.com Blazor UI.",
+  "scripts": {
+    "css": "tailwindcss -i src/Tuesday.Web/Styles/app.css -o src/Tuesday.Web/wwwroot/css/tailwind.css --minify",
+    "css:watch": "tailwindcss -i src/Tuesday.Web/Styles/app.css -o src/Tuesday.Web/wwwroot/css/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.11",
+    "tailwindcss": "^4.1.11"
+  }
+}
