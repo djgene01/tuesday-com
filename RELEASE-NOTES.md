@@ -1,7 +1,18 @@
-# Release notes — Tuesday.com 0.9.9 (release candidate)
+# Release notes — Tuesday.com 0.9.10 (release candidate)
 
 **Status:** release candidate for an internal work-tracking deployment. Not 1.0.
-**Date:** 2026-11-05 · **Version:** 0.9.9 · **Image tag:** `tuesday-web:0.9.9`
+**Date:** 2026-11-05 · **Version:** 0.9.10 · **Image tag:** `tuesday-web:0.9.10`
+
+Changes since 0.9.9:
+
+- **Images no longer stretch.** Every `<img>` carries `width`/`height`, and browsers honour that
+  `height` as a *definite* length unless CSS sets `height: auto`, so each picture was being pulled to
+  its container width while keeping its attribute height — the hero rendered 1040x1024 instead of
+  1040x693. Each image now declares `height:auto` plus an explicit `aspect-ratio`, so the rendered
+  frame matches the file exactly (measured 1.500 / 1.600 / 1.000 / 1.333 on desktop and on a 390 px
+  viewport).
+- The product screenshot was re-cut to a clean 16:10 frame (1344x840) with hidden scrollbars, and the
+  hero caption no longer floats over the artwork.
 
 Changes since 0.9.8:
 
