@@ -1,0 +1,70 @@
+﻿@page "/"
+@using Microsoft.Extensions.Diagnostics.HealthChecks
+@inject HealthCheckService HealthChecks
+@inject IHostEnvironment Environment
+
+<PageTitle>Tuesday.com — infrastructure status</PageTitle>
+
+<main class="shell">
+    <header class="masthead">
+        <p class="eyebrow">Walking skeleton · phase P0</p>
+        <h1>Tuesday<span class="dot">.</span>com</h1>
+        <p class="lede">
+            The work operating system is not built yet. This page exists to prove the
+            pipeline is real: the host starts, configuration is validated, dependencies are
+            probed, and every request carries a correlation id.
+        </p>
+    </header>
+
+    <section class="panel" aria-labelledby="deps">
+        <h2 id="deps">Dependencies</h2>
+        <ul class="checks">
+            @foreach (var entry in _report.Entries)
+            {
+                <li class="check @StatusClass(entry.Value.Status)">
+                    <span class="badge">@entry.Value.Status</span>
+                    <span class="check-name">@entry.Key</span>
+                    <span class="check-detail">@entry.Value.Description</span>
+                </li>
+            }
+        </ul>
+        <p class="meta">
+            Overall: <strong>@_report.Status</strong> · checked @_checkedAt.ToString("HH:mm:ss") UTC
+        </p>
+    </section>
+
+    <section class="panel" aria-labelledby="runtime">
+        <h2 id="runtime">Runtime</h2>
+        <dl class="facts">
+            <div><dt>Environment</dt><dd>@Environment.EnvironmentName</dd></div>
+            <div><dt>Runtime</dt><dd>@System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription</dd></div>
+            <div><dt>Machine</dt><dd>@System.Environment.MachineName</dd></div>
+            <div><dt>Started</dt><dd>@_startedAt.ToString("yyyy-MM-dd HH:mm:ss") UTC</dd></div>
+        </dl>
+    </section>
+
+    <footer class="foot">
+        <a href="/health/ready">/health/ready</a>
+        <a href="/health/live">/health/live</a>
+        <span>Phase P0 gate: build clean, health green, page visible.</span>
+    </footer>
+</main>
+
+@code {
+    private HealthReport _report = new(new Dictionary<string, HealthReportEntry>(), TimeSpan.Zero);
+    private readonly DateTimeOffset _startedAt = DateTimeOffset.UtcNow;
+    private DateTimeOffset _checkedAt = DateTimeOffset.UtcNow;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _report = await HealthChecks.CheckHealthAsync().ConfigureAwait(false);
+        _checkedAt = DateTimeOffset.UtcNow;
+    }
+
+    private static string StatusClass(HealthStatus status) => status switch
+    {
+        HealthStatus.Healthy => "is-ok",
+        HealthStatus.Degraded => "is-warn",
+        _ => "is-bad"
+    };
+}

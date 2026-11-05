@@ -1,0 +1,8 @@
+flowchart LR
+    E["Integration event"] --> T["Trigger registry"]
+    T --> C["Condition evaluator<br/>item snapshot"]
+    C --> Q["Quota meter<br/>before execution"]
+    Q --> A["Action executor<br/>ordered, isolated"]
+    A --> WH["Signed webhook<br/>handshake verified"]
+    A --> NT["Notification"]
+    WH --> EXT["External system<br/>verifies HMAC"]

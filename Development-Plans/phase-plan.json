@@ -1,0 +1,445 @@
+{
+  "document": {
+    "product": "Tuesday.com",
+    "kind": "phased-delivery-plan",
+    "version": "1.0",
+    "compiled": "2026-11-03",
+    "stack": {
+      "runtime": ".NET 10 LTS (net10.0)",
+      "web": "ASP.NET Core 10 + Blazor Web App",
+      "ui": "Interactive Server for board surfaces, static SSR for auth and marketing",
+      "orm": "EF Core 10.0.14",
+      "database": "MySQL 8.4 via Oracle MySql.EntityFrameworkCore 10.0.12",
+      "hosting": "On-premises: Docker Compose primary, Windows Server + IIS secondary"
+    },
+    "index": "00-Contents.md",
+    "note": "Descriptive only. No application code is included, and no command in this file has been executed as part of producing the documentation."
+  },
+  "decisions": [
+    { "id": "D1", "decision": ".NET 10 LTS", "rationale": "Only supported stable runtime; .NET 11 is RC3 with GA 2026-11-10 and is STS; .NET 8 and 9 leave support on 2026-11-10.", "source": "S15" },
+    { "id": "D2", "decision": "EF Core 10 + MySQL via Oracle MySql.EntityFrameworkCore 10.0.12", "rationale": "Owner choice of MySQL; Pomelo has no EF Core 10 release (issue 2007 open, latest stable 9.0.0 on EF Core 9).", "source": "S19,S20", "risk": "GPLv2 with FOSS exception requires a commercial connector licence for closed-source distribution (Q1)." },
+    { "id": "D3", "decision": "Blazor Web App, Interactive Server for board surfaces, static SSR elsewhere", "rationale": "Dense stateful grid; SignalR required regardless; no WebAssembly payload.", "source": "S16" },
+    { "id": "D4", "decision": "On-premises Docker Compose primary, Windows Server + IIS secondary", "rationale": "Owner infrastructure.", "source": "S18" },
+    { "id": "D5", "decision": "Core recipes + multi-action + scheduled triggers, no marketplace", "rationale": "Behavioural parity with documented trigger/condition/action model without marketplace economics.", "source": "S1,S6" },
+    { "id": "D6", "decision": "Clean-room: behavioural parity only", "rationale": "Legal defensibility; no source, assets, trademarks or trade dress.", "source": "11-Clean-Room-Protocol.md" }
+  ],
+  "phases": [
+    {
+      "id": "P0",
+      "name": "Foundations and walking skeleton",
+      "objective": "A repository that builds, starts, reports health, logs with correlation, and deploys to both target hosts.",
+      "scope": [
+        "Seven projects per architecture section 3.1, all targeting net10.0",
+        "Layered configuration with fail-fast startup validation",
+        "MySQL and Redis containers for local development",
+        "Structured logging with correlation id and OpenTelemetry traces",
+        "Health endpoints live and ready",
+        "CI: restore, build, unit test, licence scan, secret scan"
+      ],
+      "outOfScope": [
+        "Any domain entity or table",
+        "Authentication",
+        "Any UI beyond one static page"
+      ],
+      "affectedAreas": ["Tuesday.Domain", "Tuesday.Application", "Tuesday.Infrastructure", "Tuesday.Web", "Tuesday.Worker", "Tuesday.Contracts", "CI pipeline"],
+      "dependencies": [],
+      "slice": {
+        "description": "The app starts from a clean clone, /health/ready reports MySQL and Redis reachable, and one static SSR page renders visible content.",
+        "files": [
+          "Tuesday.slnx",
+          "global.json",
+          "src/Tuesday.Web/Program.cs",
+          "src/Tuesday.Web/Components/App.razor",
+          "src/Tuesday.Web/Components/Routes.razor",
+          "src/Tuesday.Web/appsettings.json",
+          "src/Tuesday.Worker/Program.cs",
+          "docker/compose.yaml",
+          ".github/workflows/ci.yml"
+        ],
+        "commands": [
+          "dotnet restore Tuesday.slnx",
+          "dotnet build Tuesday.slnx --configuration Release --no-restore",
+          "dotnet test Tuesday.slnx --configuration Release --no-build",
+          "docker compose -f docker/compose.yaml up -d mysql redis",
+          "dotnet run --project src/Tuesday.Web"
+        ],
+        "observableChecks": [
+          "Browser shows the page content, not an empty shell",
+          "GET /health/live returns healthy",
+          "GET /health/ready returns healthy with both dependencies",
+          "One log line carries a correlation id",
+          "Response headers show the expected content types for CSS and JS"
+        ]
+      },
+      "exitCriteria": [
+        "Release build succeeds with zero warnings",
+        "All unit tests pass",
+        "Both health endpoints green",
+        "Static page verified by screenshot, not by HTTP status",
+        "CI green on a clean checkout"
+      ],
+      "validationGate": "Operator confirms the app starts on their target host path and the health page is reachable.",
+      "manuals": ["02-Architecture.md", "08-Deployment-and-Operations.md", "07-Testing-Strategy.md"],
+      "diagrams": ["Diagrams/p0-foundations-slice.pdf", "Diagrams/02-module-layers.pdf"],
+      "sizeBand": "XS",
+      "estimatedWeeks": { "min": 2, "max": 3 }
+    },
+    {
+      "id": "P1",
+      "name": "Identity, tenancy and workspaces",
+      "objective": "Four roles, proven tenant isolation, workspaces, board shells and grants.",
+      "scope": [
+        "OpenIddict authorization server with cookie session and PATs",
+        "ASP.NET Core Identity user store, TOTP MFA",
+        "Account, Membership, tenant context, global query filter, write interceptor",
+        "Permission snapshot and resource-based policies",
+        "Workspace, folder, visibility rules, board shell, board grants",
+        "Circuit security-stamp revalidation",
+        "Isolation suite and capability matrix tests"
+      ],
+      "outOfScope": [
+        "Column definitions and items",
+        "Board views",
+        "Notifications"
+      ],
+      "affectedAreas": ["Tenancy module", "Workspaces module", "Security", "Tuesday.Web auth wiring"],
+      "dependencies": ["P0", "Open question Q4 (guest visibility of subitems) before the grant model hardens"],
+      "slice": {
+        "description": "Sign in, create a workspace, create a board shell, invite a viewer, and prove a guest receives 404 for an ungranted board.",
+        "files": [
+          "src/Tuesday.Domain/Tenancy/Account.cs",
+          "src/Tuesday.Domain/Tenancy/Membership.cs",
+          "src/Tuesday.Application/Tenancy/TenantContext.cs",
+          "src/Tuesday.Application/Security/PermissionSnapshot.cs",
+          "src/Tuesday.Infrastructure/Persistence/TenantQueryFilter.cs",
+          "src/Tuesday.Web/Components/Pages/Login.razor",
+          "src/Tuesday.Web/Components/Pages/Workspace.razor",
+          "tests/Tuesday.Tests.Isolation/CrossTenantSuite.cs"
+        ],
+        "commands": [
+          "dotnet ef migrations add InitialTenancy --project src/Tuesday.Infrastructure",
+          "dotnet ef migrations script --idempotent --project src/Tuesday.Infrastructure --output artifacts/schema.sql",
+          "dotnet test tests/Tuesday.Tests.Isolation",
+          "dotnet run --project src/Tuesday.Web"
+        ],
+        "observableChecks": [
+          "Sign-in redirects to the workspace and the session survives a refresh",
+          "Invited viewer sees the board read-only, with no edit affordance",
+          "Guest sees only the granted board; other board URLs return 404",
+          "Role change takes effect on a live session within 60 seconds",
+          "Audit rows exist for tenant creation, invite and grant"
+        ]
+      },
+      "exitCriteria": [
+        "All eight isolation tests green",
+        "Full capability matrix green for four roles",
+        "Viewer cannot obtain a usable API token",
+        "No production code path calls IgnoreQueryFilters outside the tenancy module"
+      ],
+      "validationGate": "An operator signs in as each of the four roles and confirms each sees exactly what the capability table promises.",
+      "manuals": ["02-Architecture.md", "05-Security-and-Compliance.md", "10-Acceptance-Checklists.md"],
+      "diagrams": ["Diagrams/p1-identity-slice.pdf", "Diagrams/08-permission-model.pdf"],
+      "sizeBand": "S",
+      "estimatedWeeks": { "min": 4, "max": 6 }
+    },
+    {
+      "id": "P2",
+      "name": "Boards, groups, columns and the item grid",
+      "objective": "A usable board: columns, groups, items, subitems and a fast, keyboard-operable grid.",
+      "scope": [
+        "Schema for Board, BoardColumn, ItemGroup, Item, ItemColumnValue and projections",
+        "Single value-writer path maintaining JSON and typed projections",
+        "Virtualised grid with inline edit, keyboard model, drag reorder, multi-select",
+        "Subitems with their own column structure and copy-not-sync semantics",
+        "P2 column type set",
+        "100k-item performance checkpoint"
+      ],
+      "outOfScope": [
+        "Kanban, calendar, timeline, gantt",
+        "Automations",
+        "Public API"
+      ],
+      "affectedAreas": ["Boards module", "Items module", "Values module", "Grid components", "Indexes"],
+      "dependencies": ["P1", "Q1 (MySQL connector licence) resolution before external distribution"],
+      "slice": {
+        "description": "Build a board with eight columns, three groups and 500 items; edit a cell inline; reload and see the value persisted.",
+        "files": [
+          "src/Tuesday.Domain/Boards/Board.cs",
+          "src/Tuesday.Domain/Boards/BoardColumn.cs",
+          "src/Tuesday.Domain/Items/Item.cs",
+          "src/Tuesday.Application/Values/ColumnValueWriter.cs",
+          "src/Tuesday.Infrastructure/Persistence/Configurations/ItemColumnValueConfiguration.cs",
+          "src/Tuesday.Web/Components/Board/TableView.razor",
+          "src/Tuesday.Web/Components/Board/ColumnCell.razor",
+          "src/Tuesday.Web/wwwroot/js/grid.js",
+          "tests/Tuesday.Tests.Integration/ProjectionConsistencyTests.cs"
+        ],
+        "commands": [
+          "dotnet ef migrations add BoardCore --project src/Tuesday.Infrastructure",
+          "dotnet test tests/Tuesday.Tests.Integration --filter Category=Projection",
+          "dotnet run --project src/Tuesday.Web",
+          "dotnet run --project tools/Tuesday.LoadProbe -- --board 5000 --items 100000"
+        ],
+        "observableChecks": [
+          "Cell edit shows immediately and survives a hard reload",
+          "Keyboard-only edit works: Tab, arrows, Enter, Escape, focus retained",
+          "Drag a row within a group and across groups; siblings keep their position keys",
+          "Subitem expansion shows its own column headers; editing the parent does not change the subitem",
+          "Adding the 501st column is refused with a typed error",
+          "Board page loads under 1.5 s p95 at 5,000 items"
+        ]
+      },
+      "exitCriteria": [
+        "A user builds and uses a real board for 30 minutes without a blocker",
+        "NFR-1 met at 5,000 items; 100k checkpoint under 3 s with no filesort",
+        "Projection consistency suite green on 1,000 sampled rows",
+        "UI evidence gates G-UI-1 to G-UI-7 satisfied for the board route"
+      ],
+      "validationGate": "A real user models their actual work on the board for half an hour and reports no blocking gap.",
+      "manuals": ["03-Data-Model.md", "04-UI-and-UX-Plan.md", "07-Testing-Strategy.md"],
+      "diagrams": ["Diagrams/p2-board-grid-slice.pdf", "Diagrams/04-data-model-er.pdf"],
+      "sizeBand": "L",
+      "estimatedWeeks": { "min": 9, "max": 12 }
+    },
+    {
+      "id": "P3",
+      "name": "Views: Kanban, Calendar, Timeline, Gantt",
+      "objective": "Four real projections of the same board data, each with a persisted drag interaction.",
+      "scope": [
+        "Kanban with status-only grouping, divide-by, empty-lane hiding, cover and card columns",
+        "Calendar placement by date column with month and week modes",
+        "Timeline with two-date bars and drag reschedule",
+        "Gantt with dependency arrows and cycle refusal",
+        "Remaining column types including location, country, doc, dependency, board_relation, checkbox, button and read-only types",
+        "View limit enforcement at 100 per board"
+      ],
+      "outOfScope": ["Workload, map, form, pivot and blank views"],
+      "affectedAreas": ["Views module", "Columns module", "View components", "timeline.js and dnd.js"],
+      "dependencies": ["P2"],
+      "slice": {
+        "description": "The same board rendered as Kanban, Calendar, Timeline and Gantt, with one drag in each view that persists after reload.",
+        "files": [
+          "src/Tuesday.Application/Views/KanbanProjection.cs",
+          "src/Tuesday.Application/Views/CalendarProjection.cs",
+          "src/Tuesday.Web/Components/Views/KanbanView.razor",
+          "src/Tuesday.Web/Components/Views/TimelineView.razor",
+          "src/Tuesday.Web/Components/Views/GanttView.razor",
+          "src/Tuesday.Web/wwwroot/js/timeline.js",
+          "src/Tuesday.Web/wwwroot/js/dnd.js"
+        ],
+        "commands": [
+          "dotnet build Tuesday.slnx --configuration Release",
+          "dotnet test tests/Tuesday.Tests.E2E --filter Category=Views",
+          "dotnet run --project src/Tuesday.Web"
+        ],
+        "observableChecks": [
+          "Kanban columns match status labels exactly, and an empty lane is hidden when the option is on",
+          "Calendar places items on their date column and switches month to week",
+          "Timeline bar drag changes the start date and survives reload",
+          "Gantt draws dependency arrows; creating a dependency cycle is refused",
+          "Adding the 101st view is refused",
+          "Contrast passes AA in Chromium, Firefox and WebKit"
+        ]
+      },
+      "exitCriteria": [
+        "Each view is a live projection with at least one persisted interaction",
+        "No view duplicates data storage; all writes go through the value writer",
+        "Accessibility checks clean on all four views across the three engines"
+      ],
+      "validationGate": "A user who works in Kanban confirms they would use this view instead of a spreadsheet.",
+      "manuals": ["03-Data-Model.md", "04-UI-and-UX-Plan.md", "10-Acceptance-Checklists.md"],
+      "diagrams": ["Diagrams/p3-views-slice.pdf", "Diagrams/07-render-mode-boundaries.pdf"],
+      "sizeBand": "L",
+      "estimatedWeeks": { "min": 8, "max": 11 }
+    },
+    {
+      "id": "P4",
+      "name": "Collaboration: updates, notifications, search",
+      "objective": "People can discuss work, be notified, and find things, with real-time delivery.",
+      "scope": [
+        "Updates with sanitised HTML, replies and likes",
+        "In-app notifications, email via SMTP, preferences and subscriptions",
+        "FULLTEXT search over item names and update bodies, permission filtered",
+        "Attachments with signed URLs and expiry",
+        "Presence and reconnect-by-version"
+      ],
+      "outOfScope": ["Mentions autocomplete beyond basic matching", "Mobile push"],
+      "affectedAreas": ["Collaboration module", "Notifications module", "Search module", "SignalR hub groups"],
+      "dependencies": ["P3"],
+      "slice": {
+        "description": "Post an update on an item from one browser, see it appear in a second browser without refresh, receive a notification, and find the item by search.",
+        "files": [
+          "src/Tuesday.Domain/Collaboration/Update.cs",
+          "src/Tuesday.Application/Collaboration/PostUpdateHandler.cs",
+          "src/Tuesday.Application/Notifications/NotificationFanout.cs",
+          "src/Tuesday.Web/Components/Item/ItemPanel.razor",
+          "src/Tuesday.Web/Hubs/BoardHub.cs",
+          "src/Tuesday.Infrastructure/Search/SearchIndexer.cs"
+        ],
+        "commands": [
+          "dotnet ef migrations add Collaboration --project src/Tuesday.Infrastructure",
+          "dotnet test tests/Tuesday.Tests.Integration --filter Category=Collaboration",
+          "dotnet test tests/Tuesday.Tests.E2E --filter Category=Realtime",
+          "dotnet run --project src/Tuesday.Web"
+        ],
+        "observableChecks": [
+          "Update appears in the second browser within 2 seconds without refresh",
+          "Script payload in an update body is rendered inert",
+          "Reply and like counts are correct after reload",
+          "Notification appears in the bell and an email is queued",
+          "Search finds a term in an item name and in an update body",
+          "Search never returns an item from a board the user cannot see"
+        ]
+      },
+      "exitCriteria": [
+        "Two users on two browsers see each other's updates live",
+        "Search respects permissions under the isolation suite",
+        "Attachment signed URL expires and is rejected afterwards"
+      ],
+      "validationGate": "A team runs a real stand-up on the product for one week.",
+      "manuals": ["02-Architecture.md", "06-Integrations-and-Extensibility.md", "05-Security-and-Compliance.md"],
+      "diagrams": ["Diagrams/p4-collaboration-slice.pdf", "Diagrams/03-request-lifecycle.pdf"],
+      "sizeBand": "M",
+      "estimatedWeeks": { "min": 4, "max": 6 }
+    },
+    {
+      "id": "P5",
+      "name": "Automations, webhooks and public API",
+      "objective": "The product does work by itself and exposes an integration surface an outsider can use with documentation only.",
+      "scope": [
+        "Recipe model with trigger, conditions and ordered multi-actions",
+        "Trigger registry, condition evaluator, action executor, loop guard, quota metering",
+        "Quartz cluster with recurring and date-arrival triggers",
+        "Outbound webhooks with challenge handshake, HMAC signing, retries and auto-disable",
+        "REST API v1 with cursor pagination, idempotency keys, cost model and OpenAPI snapshot",
+        "SSRF guard on webhook registration and delivery"
+      ],
+      "outOfScope": ["GraphQL unless Q2 says otherwise", "Marketplace", "Third-party app OAuth consent"],
+      "affectedAreas": ["Automation module", "Integrations module", "Tuesday.Worker", "API surface"],
+      "dependencies": ["P4", "Q2 (GraphQL) and Q3 (date-arrival timezone) answered before engine hardening"],
+      "slice": {
+        "description": "The worked example recipe fires end to end (status becomes Done, owner notified, subitem created), and an external endpoint receives a signed webhook after completing the challenge handshake.",
+        "files": [
+          "src/Tuesday.Domain/Automation/Automation.cs",
+          "src/Tuesday.Application/Automation/TriggerRegistry.cs",
+          "src/Tuesday.Application/Automation/ConditionEvaluator.cs",
+          "src/Tuesday.Application/Automation/ActionExecutor.cs",
+          "src/Tuesday.Worker/Jobs/OutboxRelay.cs",
+          "src/Tuesday.Worker/Jobs/WebhookDeliveryJob.cs",
+          "src/Tuesday.Web/Endpoints/Api/V1/ItemsEndpoints.cs",
+          "tests/Tuesday.Tests.Integration/AutomationLoopTests.cs"
+        ],
+        "commands": [
+          "dotnet ef migrations add Automation --project src/Tuesday.Infrastructure",
+          "dotnet test tests/Tuesday.Tests.Integration --filter Category=Automation",
+          "dotnet test tests/Tuesday.Tests.Contract",
+          "dotnet run --project src/Tuesday.Worker",
+          "dotnet run --project src/Tuesday.Web"
+        ],
+        "observableChecks": [
+          "Recipe fires on status change, notifies the owner, and creates the follow-up subitem",
+          "A failing webhook action does not stop the following notification action",
+          "A self-triggering recipe stops at depth 3 and records LoopPrevented",
+          "Over-quota execution is refused before any action runs",
+          "Webhook is not delivered until the challenge is echoed",
+          "Tampered body and stale timestamp are rejected by the receiver test harness",
+          "The 1,001st daily call on a Standard-tier tenant is refused with retry_in_seconds",
+          "Repeating a request with the same Idempotency-Key produces one side effect"
+        ]
+      },
+      "exitCriteria": [
+        "The worked example fires end to end with an auditable run log",
+        "An external integrator succeeds using only the API documentation",
+        "OpenAPI snapshot diff clean; no breaking change inside v1",
+        "All P5 checklist items in the acceptance manual satisfied"
+      ],
+      "validationGate": "A non-author integrates one real external system without help from the build team.",
+      "manuals": ["06-Integrations-and-Extensibility.md", "05-Security-and-Compliance.md", "10-Acceptance-Checklists.md"],
+      "diagrams": ["Diagrams/p5-automation-slice.pdf", "Diagrams/05-automation-engine-flow.pdf"],
+      "sizeBand": "L",
+      "estimatedWeeks": { "min": 6, "max": 9 }
+    },
+    {
+      "id": "P6",
+      "name": "Dashboards, hardening and on-prem release",
+      "objective": "Something an operator can install from scratch, back up, roll back and trust.",
+      "scope": [
+        "Dashboard with chart, count and list widgets, permission-aware",
+        "CSP and security headers, dependency and licence closure, SBOM",
+        "Performance soak at 200 users and a 5,000-item board",
+        "Backup, restore and rollback rehearsals",
+        "Second-replica checklist: shared key ring, affinity, WebSockets",
+        "Compose bundle, IIS deployment guide, upgrade and runbook set"
+      ],
+      "outOfScope": ["Managed service", "Multi-region DR", "Enterprise SSO unless Q6 says otherwise"],
+      "affectedAreas": ["Dashboards module", "Security hardening", "Packaging", "Runbooks", "CI release stage"],
+      "dependencies": ["P5", "Q5 (retention) and Q6 (SSO) answered"],
+      "slice": {
+        "description": "A dashboard with three widgets over a live board, deployed to the target host, with a backup restored into a scratch environment and a rollback from N+1 to N demonstrated.",
+        "files": [
+          "src/Tuesday.Web/Components/Dashboards/DashboardPage.razor",
+          "src/Tuesday.Application/Dashboards/WidgetQueryService.cs",
+          "docker/compose.yaml",
+          "docker/nginx/tuesday.conf",
+          "deploy/iis/web.config",
+          "docs/runbooks/restore.md",
+          "docs/runbooks/rollback.md",
+          ".github/workflows/release.yml"
+        ],
+        "commands": [
+          "dotnet publish src/Tuesday.Web --configuration Release --output artifacts/web",
+          "docker build --pull -t tuesday-web:1.0.0 .",
+          "docker compose -f docker/compose.yaml up -d",
+          "mysqldump --single-transaction --routines --triggers tuesday > artifacts/backup.sql",
+          "dotnet test tests/Tuesday.Tests.Performance"
+        ],
+        "observableChecks": [
+          "Dashboard widgets reflect live board data and respect viewer permissions",
+          "WebSocket upgrade succeeds at the proxy, not a long-poll fallback",
+          "Two web replicas share the key ring; no random sign-outs during a 10-minute soak",
+          "Backup restored into a scratch instance serves a working board",
+          "Rollback to the previous image restores sign-in and a working write path",
+          "Security headers present; CSP enforced after a report-only week"
+        ]
+      },
+      "exitCriteria": [
+        "Operator installs from scratch using only the runbooks",
+        "Backup, restore and rollback each demonstrated once by the operator",
+        "Performance targets met at 200 users",
+        "Licence register clean or Q1 resolved",
+        "SBOM archived with the release",
+        "Clean-room CI scans active and green"
+      ],
+      "validationGate": "Operator installs on a clean host and runs a real workload for one week before 1.0 sign-off.",
+      "manuals": ["08-Deployment-and-Operations.md", "10-Acceptance-Checklists.md", "09-Risks-and-Open-Questions.md"],
+      "diagrams": ["Diagrams/p6-release-slice.pdf", "Diagrams/06-deployment-topology.pdf"],
+      "sizeBand": "M",
+      "estimatedWeeks": { "min": 4, "max": 6 }
+    }
+  ],
+  "crossPhaseGates": [
+    { "gate": "Release build with zero warnings", "from": "P0", "evidence": "build log" },
+    { "gate": "Unit and integration tests green", "from": "P0", "evidence": "test output" },
+    { "gate": "Tenant isolation suite green", "from": "P1", "evidence": "suite output" },
+    { "gate": "UI evidence G-UI-1 to G-UI-7 on changed routes", "from": "P1", "evidence": "screenshot plus console and asset diagnostics" },
+    { "gate": "Accessibility: no serious or critical violations on changed pages", "from": "P1", "evidence": "axe output" },
+    { "gate": "Licence scan clean", "from": "P0", "evidence": "scan output" },
+    { "gate": "Clean-room scans clean (banned strings, assets, screenshots)", "from": "P0", "evidence": "CI output" },
+    { "gate": "No unlabelled requirement introduced", "from": "P0", "evidence": "PR review against requirements traceability" }
+  ],
+  "totals": {
+    "effortPersonWeeks": { "min": 37, "max": 53 },
+    "tshirt": "XL",
+    "calendarEstimate": "5 to 7 months for a four-person team including a dedicated tester",
+    "phaseCount": 7
+  },
+  "openQuestions": [
+    { "id": "Q1", "question": "Is the Oracle MySQL connector licence purchased, or does distribution stay internal-only?", "owner": "Product owner", "neededBy": "before external distribution", "default": "internal-only deployment; licence tracked as release blocker" },
+    { "id": "Q2", "question": "REST only, or REST plus GraphQL?", "owner": "Product owner", "neededBy": "P5 start", "default": "REST only" },
+    { "id": "Q3", "question": "Is date-arrival evaluated in tenant timezone or per-user timezone?", "owner": "Product owner", "neededBy": "P5 start", "default": "tenant timezone" },
+    { "id": "Q4", "question": "May guests see subitems of a granted item?", "owner": "Product owner", "neededBy": "P1", "default": "no, granted items only" },
+    { "id": "Q5", "question": "Retention period for audit and automation-run history?", "owner": "Ops lead", "neededBy": "P6", "default": "24 months hot then archive" },
+    { "id": "Q6", "question": "Is enterprise SSO federation in 1.0?", "owner": "Product owner", "neededBy": "P6", "default": "stretch only" },
+    { "id": "Q7", "question": "Will a hosted multi-tenant edition ever be required?", "owner": "Product owner", "neededBy": "post 1.0", "default": "no" }
+  ]
+}

@@ -1,0 +1,198 @@
+@using Tuesday.Application.Boards
+@using Tuesday.Application.Views
+@using Tuesday.Infrastructure.Values
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject ColumnValueWriter Writer
+@inject IJSRuntime JS
+
+@if (Model.Bars.Count == 0)
+{
+    <p class="meta">No item on this board has a start date, so there is nothing to place on the timeline.</p>
+}
+else
+{
+    @if (_error is not null)
+    {
+        <p class="alert alert-bad" role="alert">@_error</p>
+    }
+
+    <div class="tl-toolbar">
+        <p class="meta">
+            @Model.From.ToString("d MMM") – @Model.To.ToString("d MMM yyyy") ·
+            @Model.Bars.Count scheduled · @Model.Unscheduled.Count without a start date
+        </p>
+        <p class="meta">Drag a bar, or use the day buttons next to it.</p>
+    </div>
+
+    <div class="tl" role="table" aria-label="Board timeline">
+        <div class="tl-head" role="row">
+            <span class="tl-label" role="columnheader">Item</span>
+            <div class="tl-scale" role="columnheader" aria-hidden="true">
+                @foreach (var tick in Model.Ticks)
+                {
+                    <span class="tl-tick" style="left:@(tick.LeftPercent)%">@tick.Date.ToString("d MMM")</span>
+                }
+            </div>
+        </div>
+
+        @foreach (var bar in Shown)
+        {
+            <div class="tl-row" role="row">
+                <span class="tl-label" role="cell">@bar.Name</span>
+                <div class="tl-track" role="cell" data-timeline-track data-span="@Model.DaySpan">
+                    <div class="tl-bar"
+                         data-item-id="@bar.ItemId"
+                         style="@Style(bar)"
+                         title="@($"{bar.Start:d MMM} – {bar.End:d MMM}, {bar.DayCount} days")">
+                        <span class="tl-bar-text">@bar.DayCount d</span>
+                    </div>
+                </div>
+                <div class="tl-actions">
+                    @if (CanEdit)
+                    {
+                        <button type="button" class="btn-quiet" @onclick="() => ShiftAsync(bar.ItemId, -1)"
+                                aria-label="@($"Move {bar.Name} one day earlier")">−1d</button>
+                        <button type="button" class="btn-quiet" @onclick="() => ShiftAsync(bar.ItemId, 1)"
+                                aria-label="@($"Move {bar.Name} one day later")">+1d</button>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (Model.Bars.Count > Shown.Count)
+    {
+        <p class="meta">Showing the first @Shown.Count of @Model.Bars.Count bars.</p>
+    }
+}
+
+@code {
+    private const int MaxBars = 60;
+
+    [Parameter, EditorRequired]
+    public BoardModel Board { get; set; } = default!;
+
+    [Parameter]
+    public Guid StartColumnId { get; set; }
+
+    [Parameter]
+    public Guid EndColumnId { get; set; }
+
+    [Parameter]
+    public bool CanEdit { get; set; }
+
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    private string? _error;
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<TimelineView>? _self;
+    private bool _wired;
+
+    private TimelineModel Model =>
+        Board is null || StartColumnId == Guid.Empty
+            ? new TimelineModel(DateOnly.FromDateTime(DateTime.UtcNow), DateOnly.FromDateTime(DateTime.UtcNow), [], [], [])
+            : TimelineProjection.Build(Board, StartColumnId, EndColumnId == Guid.Empty ? StartColumnId : EndColumnId);
+
+    private IReadOnlyList<TimelineBar> Shown => Model.Bars.Take(MaxBars).ToList();
+
+    // CSS lengths are locale-independent; a comma separator would silently drop the rule.
+    private static string Style(TimelineBar bar) => string.Create(
+        System.Globalization.CultureInfo.InvariantCulture,
+        $"left:{bar.LeftPercent:0.####}%;width:{Math.Max(bar.WidthPercent, 1.2):0.####}%");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (StartColumnId == Guid.Empty)
+        {
+            return;
+        }
+
+        if (!_wired)
+        {
+            _wired = true;
+            _self = DotNetObjectReference.Create(this);
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/timeline.js");
+            await _module.InvokeVoidAsync("setHandler", _self);
+        }
+
+        if (_module is not null)
+        {
+            // Re-binding after every render is what makes a freshly drawn bar draggable.
+            await _module.InvokeVoidAsync("bind");
+        }
+    }
+
+    [JSInvokable]
+    public async Task ShiftAsync(string itemId, int days)
+    {
+        if (!Guid.TryParse(itemId, out var id))
+        {
+            return;
+        }
+
+        await ShiftAsync(id, days);
+    }
+
+    private async Task ShiftAsync(Guid itemId, int days)
+    {
+        if (!CanEdit)
+        {
+            return;
+        }
+
+        var bar = Model.Bars.FirstOrDefault(candidate => candidate.ItemId == itemId);
+        if (bar is null)
+        {
+            return;
+        }
+
+        _error = null;
+
+        // Both columns move together, otherwise the bar silently changes length.
+        var start = await Writer.SetAsync(
+            itemId,
+            StartColumnId,
+            bar.Start.AddDays(days).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+
+        if (!start.Succeeded)
+        {
+            _error = start.Error;
+            return;
+        }
+
+        if (EndColumnId != Guid.Empty && EndColumnId != StartColumnId)
+        {
+            var end = await Writer.SetAsync(
+                itemId,
+                EndColumnId,
+                bar.End.AddDays(days).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+
+            if (!end.Succeeded)
+            {
+                _error = end.Error;
+                return;
+            }
+        }
+
+        await OnChanged.InvokeAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_module is not null)
+            {
+                await _module.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+            // The circuit is gone; there is nothing left to release.
+        }
+
+        _self?.Dispose();
+    }
+}

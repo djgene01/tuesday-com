@@ -1,0 +1,11 @@
+**/bin
+**/obj
+**/*.user
+.git
+.github
+.vs
+data
+Development-Plans
+tests
+*.log
+node_modules

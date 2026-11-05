@@ -1,0 +1,144 @@
+@page "/notifications"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Tuesday.Application.Tenancy
+@using Tuesday.Infrastructure.Collaboration
+@using Tuesday.Web.Security
+@attribute [Authorize]
+@inject NotificationService Inbox
+@inject ITenantContext Tenant
+@inject TenantContextBootstrapper Bootstrapper
+
+<PageTitle>Notifications — Tuesday.com</PageTitle>
+
+<main class="shell">
+    <p class="eyebrow">Your account</p>
+    <div class="board-head">
+        <h1>Notifications</h1>
+        @if (_rows is { Count: > 0 } && _rows.Any(row => !row.IsRead))
+        {
+            <button type="button" class="btn" @onclick="MarkAllAsync" disabled="@_busy">Mark all read</button>
+        }
+    </div>
+
+    <div class="composer">
+        <label class="field checkbox-row">
+            <input type="checkbox" checked="@_emailEnabled" @onchange="ToggleEmailAsync" />
+            <span>Email me about mentions and replies</span>
+        </label>
+        <p class="meta">In-app notifications are always on. Email only goes out when the server has SMTP configured and you have opted in here.</p>
+    </div>
+
+    @if (_rows is null)
+    {
+        <p class="meta">Loading…</p>
+    }
+    else if (_rows.Count == 0)
+    {
+        <p class="lede">Nothing yet. Mentions and replies on items you follow appear here.</p>
+    }
+    else
+    {
+        <ul class="notification-list">
+            @foreach (var row in _rows)
+            {
+                <li class="notification @(row.IsRead ? "is-read" : "is-unread")">
+                    <span class="tag @(row.Kind == Tuesday.Domain.Collaboration.NotificationKind.Mention ? "tag-accent" : "tag-quiet")">
+                        @row.Kind
+                    </span>
+                    <div class="notification-body">
+                        <a href="@row.LinkUrl">@row.Title</a>
+                        <p class="meta">@row.Body</p>
+                    </div>
+                    <time datetime="@row.CreatedAt.ToString("O")">@row.CreatedAt.ToLocalTime().ToString("d MMM, HH:mm")</time>
+                    @if (!row.IsRead)
+                    {
+                        <button type="button" class="btn-quiet" @onclick="() => MarkReadAsync(row.Id)" disabled="@_busy">Mark read</button>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</main>
+
+@code {
+    private IReadOnlyList<NotificationRow>? _rows;
+    private bool _busy;
+    private bool _emailEnabled;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Bootstrapper.EnsureResolvedAsync();
+        await LoadAsync();
+
+        if (Tenant.UserId is { } userId)
+        {
+            _emailEnabled = await Inbox.EmailEnabledAsync(userId);
+        }
+    }
+
+    private async Task ToggleEmailAsync(ChangeEventArgs args)
+    {
+        var enabled = args.Value is true;
+
+        if (Tenant.UserId is not { } userId || Tenant.TenantId is not { } tenantId)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            _emailEnabled = await Inbox.SetEmailPreferenceAsync(tenantId, userId, enabled);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _rows = Tenant.UserId is { } userId
+            ? await Inbox.ListAsync(userId)
+            : [];
+    }
+
+    private async Task MarkReadAsync(Guid id)
+    {
+        if (Tenant.UserId is not { } userId)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            await Inbox.MarkReadAsync(userId, id);
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task MarkAllAsync()
+    {
+        if (Tenant.UserId is not { } userId)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            await Inbox.MarkAllReadAsync(userId);
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

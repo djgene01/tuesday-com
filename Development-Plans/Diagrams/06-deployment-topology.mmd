@@ -1,0 +1,34 @@
+flowchart TB
+    subgraph EDGE["Edge"]
+        NET["Operator network / internet"] --> FW["Firewall or LB<br/>TLS termination"]
+        FW --> RP["Reverse proxy<br/>nginx or IIS ARR<br/>sticky sessions"]
+    end
+    subgraph APPHOST["Application host"]
+        W1["web replica 1<br/>Blazor + API + hub"]
+        W2["web replica 2<br/>Blazor + API + hub"]
+        WK["worker<br/>outbox, scheduler, delivery"]
+    end
+    subgraph DATA["Data tier"]
+        DB[("MySQL 8.4<br/>binlog enabled")]
+        RD[("Redis 7<br/>backplane, key ring")]
+        FS[("Attachment volume")]
+    end
+    subgraph OPS["Operations"]
+        BK["backup sidecar<br/>nightly dump"]
+        LOG["Seq or Loki"]
+    end
+    RP --> W1
+    RP --> W2
+    W1 --> DB
+    W2 --> DB
+    WK --> DB
+    W1 --> RD
+    W2 --> RD
+    WK --> RD
+    W1 --> FS
+    W2 --> FS
+    BK --> DB
+    DB --> OFF[("Off-host backup")]
+    W1 --> LOG
+    W2 --> LOG
+    WK --> LOG

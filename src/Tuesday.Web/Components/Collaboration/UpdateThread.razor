@@ -1,0 +1,392 @@
+@using Microsoft.AspNetCore.Components
+@using Tuesday.Application.Collaboration
+@using Tuesday.Application.Tenancy
+@using Tuesday.Infrastructure.Collaboration
+@using Tuesday.Web.Collaboration
+@using Tuesday.Web.Security
+@implements IAsyncDisposable
+@inject UpdateService Updates
+@inject BoardBroadcaster FanOut
+@inject ITenantContext Tenant
+@inject TenantContextBootstrapper Bootstrapper
+
+<section class="thread" aria-label="Updates">
+    <header class="thread-head">
+        <h2>Updates</h2>
+        <p class="meta">@CountLabel</p>
+    </header>
+
+    @if (CanEdit)
+    {
+        <div class="composer">
+            <label class="field">
+                <span>Write an update</span>
+                <textarea @bind="_draft" @bind:event="oninput" rows="3"
+                          placeholder="Plain text, or simple HTML like <strong>bold</strong>"
+                          aria-label="Write an update"></textarea>
+            </label>
+            <div class="composer-actions">
+                <p class="meta">Formatting is limited to bold, italic, lists, quotes, code and links.</p>
+                <button type="button" class="btn" disabled="@(string.IsNullOrWhiteSpace(_draft) || _busy)"
+                        @onclick="PostAsync">
+                    @(_busy ? "Posting…" : "Post update")
+                </button>
+            </div>
+        </div>
+    }
+
+    @if (_error is not null)
+    {
+        <p class="alert alert-bad" role="alert">@_error</p>
+    }
+
+    @if (_nodes is null)
+    {
+        <p class="meta">Loading…</p>
+    }
+    else if (_nodes.Count == 0)
+    {
+        <p class="meta">No updates yet. The first one starts the conversation.</p>
+    }
+    else
+    {
+        @foreach (var node in _nodes)
+        {
+            <article class="update" aria-label="@($"Update from {node.AuthorName}")">
+                <header class="update-head">
+                    <span class="avatar" aria-hidden="true">@Initials(node.AuthorName)</span>
+                    <span class="update-author">@node.AuthorName</span>
+                    <time datetime="@node.CreatedAt.ToString("O")">@Stamp(node.CreatedAt)</time>
+                    @if (node.EditedAt is not null)
+                    {
+                        <span class="tag tag-quiet">edited</span>
+                    }
+                </header>
+
+                @if (node.IsDeleted)
+                {
+                    <p class="update-body update-deleted">This update was deleted.</p>
+                }
+                else
+                {
+                    <div class="update-body">@((MarkupString)node.Html)</div>
+                }
+
+                <footer class="update-foot">
+                    <button type="button" class="btn-like @(node.LikedByMe ? "is-liked" : null)"
+                            aria-pressed="@(node.LikedByMe ? "true" : "false")"
+                            disabled="@(!CanEdit)"
+                            @onclick="() => ToggleLikeAsync(node.Id)">
+                        ♥ @node.LikeCount
+                    </button>
+
+                    @if (CanEdit && !node.IsDeleted)
+                    {
+                        <button type="button" class="btn-quiet" @onclick="() => ToggleReply(node.Id)">
+                            @(_replyTo == node.Id ? "Cancel" : "Reply")
+                        </button>
+                    }
+
+                    @if (CanEdit && !node.IsDeleted && node.AuthorId == Tenant.UserId)
+                    {
+                        <button type="button" class="btn-quiet" @onclick="() => StartEdit(node)">
+                            @(_editingId == node.Id ? "Cancel edit" : "Edit")
+                        </button>
+                    }
+
+                    @if (CanEdit && !node.IsDeleted && (node.AuthorId == Tenant.UserId || Tenant.Role == Tuesday.Domain.Tenancy.TenantRole.Admin))
+                    {
+                        <button type="button" class="btn-quiet" @onclick="() => DeleteAsync(node.Id)" disabled="@_busy">
+                            Delete
+                        </button>
+                    }
+
+                    <button type="button" class="btn-quiet" @onclick="() => ToggleReplies(node.Id)">
+                        @(IsOpen(node.Id) ? "Hide replies" : $"Replies ({node.Replies.Count})")
+                    </button>
+                </footer>
+
+                @if (_editingId == node.Id)
+                {
+                    <div class="reply-box">
+                        <textarea @bind="_editDraft" @bind:event="oninput" rows="3"
+                                  aria-label="Edit update"></textarea>
+                        <button type="button" class="btn" disabled="@(string.IsNullOrWhiteSpace(_editDraft) || _busy)"
+                                @onclick="() => SaveEditAsync(node.Id)">
+                            Save
+                        </button>
+                    </div>
+                }
+
+                @if (_replyTo == node.Id)
+                {
+                    <div class="reply-box">
+                        <textarea @bind="_replyDraft" @bind:event="oninput" rows="2"
+                                  aria-label="@($"Reply to {node.AuthorName}")"></textarea>
+                        <button type="button" class="btn" disabled="@(string.IsNullOrWhiteSpace(_replyDraft) || _busy)"
+                                @onclick="() => ReplyAsync(node.Id)">
+                            Post reply
+                        </button>
+                    </div>
+                }
+
+                @if (IsOpen(node.Id) && node.Replies.Count > 0)
+                {
+                    <div class="replies">
+                        @foreach (var reply in node.Replies)
+                        {
+                            <article class="update update-reply" aria-label="@($"Reply from {reply.AuthorName}")">
+                                <header class="update-head">
+                                    <span class="avatar" aria-hidden="true">@Initials(reply.AuthorName)</span>
+                                    <span class="update-author">@reply.AuthorName</span>
+                                    <time datetime="@reply.CreatedAt.ToString("O")">@Stamp(reply.CreatedAt)</time>
+                                </header>
+                                <div class="update-body">@((MarkupString)reply.Html)</div>
+                                <footer class="update-foot">
+                                    <button type="button" class="btn-like @(reply.LikedByMe ? "is-liked" : null)"
+                                            aria-pressed="@(reply.LikedByMe ? "true" : "false")"
+                                            disabled="@(!CanEdit)"
+                                            @onclick="() => ToggleLikeAsync(reply.Id)">
+                                        ♥ @reply.LikeCount
+                                    </button>
+                                </footer>
+                            </article>
+                        }
+                    </div>
+                }
+            </article>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public Guid BoardId { get; set; }
+
+    [Parameter, EditorRequired]
+    public Guid ItemId { get; set; }
+
+    [Parameter]
+    public bool CanEdit { get; set; }
+
+    private IReadOnlyList<UpdateNode>? _nodes;
+    private readonly HashSet<Guid> _open = [];
+    private string _draft = string.Empty;
+    private string _replyDraft = string.Empty;
+    private Guid? _replyTo;
+    private Guid? _editingId;
+    private string _editDraft = string.Empty;
+    private string? _error;
+    private bool _busy;
+
+    private string CountLabel => _nodes is null
+        ? "Loading"
+        : $"{_nodes.Count} thread{(_nodes.Count == 1 ? string.Empty : "s")} · {_nodes.Sum(node => node.Replies.Count)} replies";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Bootstrapper.EnsureResolvedAsync();
+        await LoadAsync();
+        FanOut.Published += OnPublished;
+    }
+
+    private async Task OnPublished(UpdateEvent updateEvent)
+    {
+        // Same board, same item, and not the echo of our own write (we reload inline).
+        if (updateEvent.ItemId != ItemId || updateEvent.BoardId != BoardId)
+        {
+            return;
+        }
+
+        await InvokeAsync(async () =>
+        {
+            await LoadAsync();
+            StateHasChanged();
+        });
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        FanOut.Published -= OnPublished;
+        return ValueTask.CompletedTask;
+    }
+
+    private async Task LoadAsync()
+    {
+        _nodes = await Updates.ThreadAsync(ItemId, Tenant.UserId);
+    }
+
+    private async Task PostAsync()
+    {
+        if (Tenant.UserId is not { } userId)
+        {
+            _error = "Your session has no user identity.";
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+
+        try
+        {
+            var result = await Updates.PostAsync(BoardId, ItemId, userId, _draft);
+            if (!result.Succeeded)
+            {
+                _error = result.Error;
+                return;
+            }
+
+            _draft = string.Empty;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ReplyAsync(Guid threadId)
+    {
+        if (Tenant.UserId is not { } userId)
+        {
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+
+        try
+        {
+            var result = await Updates.ReplyAsync(threadId, userId, _replyDraft);
+            if (!result.Succeeded)
+            {
+                _error = result.Error;
+                return;
+            }
+
+            _replyDraft = string.Empty;
+            _replyTo = null;
+            _open.Add(threadId);
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ToggleLikeAsync(Guid updateId)
+    {
+        if (Tenant.UserId is not { } userId || !CanEdit)
+        {
+            return;
+        }
+
+        await Updates.ToggleLikeAsync(updateId, userId);
+        await LoadAsync();
+    }
+
+    private void ToggleReply(Guid id)
+    {
+        _replyTo = _replyTo == id ? null : id;
+        _replyDraft = string.Empty;
+    }
+
+    private void StartEdit(UpdateNode node)
+    {
+        if (_editingId == node.Id)
+        {
+            _editingId = null;
+            _editDraft = string.Empty;
+            return;
+        }
+
+        _editingId = node.Id;
+        _editDraft = node.Text;
+        _replyTo = null;
+    }
+
+    private async Task SaveEditAsync(Guid updateId)
+    {
+        if (Tenant.UserId is not { } userId)
+        {
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+
+        try
+        {
+            // The draft is plain text from the editor, so it is wrapped as a paragraph and
+            // sanitised server-side like any other write.
+            var result = await Updates.EditAsync(updateId, userId, $"<p>{System.Net.WebUtility.HtmlEncode(_editDraft)}</p>");
+
+            if (!result.Succeeded)
+            {
+                _error = result.Error;
+                return;
+            }
+
+            _editingId = null;
+            _editDraft = string.Empty;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeleteAsync(Guid updateId)
+    {
+        if (Tenant.UserId is not { } userId)
+        {
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+
+        try
+        {
+            var moderated = Tenant.Role == Tuesday.Domain.Tenancy.TenantRole.Admin;
+
+            if (!await Updates.DeleteAsync(updateId, userId, moderated))
+            {
+                _error = "That update could not be deleted.";
+                return;
+            }
+
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void ToggleReplies(Guid id)
+    {
+        if (!_open.Add(id))
+        {
+            _open.Remove(id);
+        }
+    }
+
+    private bool IsOpen(Guid id) => _open.Contains(id);
+
+    private static string Initials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length switch
+        {
+            0 => "?",
+            1 => parts[0][..1].ToUpperInvariant(),
+            _ => (parts[0][..1] + parts[^1][..1]).ToUpperInvariant()
+        };
+    }
+
+    private static string Stamp(DateTimeOffset when) =>
+        when.ToLocalTime().ToString("d MMM, HH:mm");
+}

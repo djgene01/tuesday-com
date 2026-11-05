@@ -1,0 +1,248 @@
+@page "/workspace"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Tuesday.Application.Security
+@using Tuesday.Application.Tenancy
+@using Tuesday.Domain.Tenancy
+@using Tuesday.Infrastructure.Identity
+@using Tuesday.Infrastructure.Queries
+@attribute [Authorize(Policy = "capability:ViewWorkspace")]
+@inject WorkspaceQueries Queries
+@inject ITenantContext Tenant
+@inject Tuesday.Infrastructure.Tenancy.TenantResolver Resolver
+@inject Microsoft.AspNetCore.Identity.UserManager<ApplicationUser> Users
+@inject Tuesday.Infrastructure.Persistence.TuesdayDbContext Db
+@inject ILogger<Workspace> Logger
+
+<PageTitle>Workspace — Tuesday.com</PageTitle>
+
+<main class="shell">
+    <p class="eyebrow">Workspace · @Tenant.Role</p>
+    <h1>Boards</h1>
+    <p class="lede">
+        @_boards.Count board@( _boards.Count == 1 ? "" : "s" ) visible to you.
+        @if (!CanCreate)
+        {
+            <text>Your role is read-only.</text>
+        }
+    </p>
+
+    @if (_notice is not null)
+    {
+        <p class="alert alert-ok" role="status">@_notice</p>
+    }
+
+    @if (_error is not null)
+    {
+        <p class="alert alert-bad" role="alert">@_error</p>
+    }
+
+    <section class="panel">
+        @if (_boards.Count == 0)
+        {
+            <p class="meta">No boards are shared with you yet.</p>
+        }
+        else
+        {
+            <ul class="board-list">
+                @foreach (var board in _boards)
+                {
+                    <li class="board-row">
+                        <a class="board-name" href="@($"/board/{board.Id}")">@board.Name</a>
+                        <span class="tag">@board.WorkspaceName</span>
+                        <span class="tag tag-quiet">@board.Type</span>
+                        @if (board.IsGranted)
+                        {
+                            <span class="tag tag-grant">Granted</span>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+
+    @if (CanCreate)
+    {
+        <section class="panel">
+            <h2>New board</h2>
+            <EditForm Model="NewBoard" FormName="create-board" method="post" OnValidSubmit="CreateBoardAsync">
+                <DataAnnotationsValidator />
+                <div class="form-row">
+                    <label class="field">
+                        <span>Name</span>
+                        <InputText @bind-Value="NewBoard.Name" required />
+                    </label>
+                    <label class="field">
+                        <span>Workspace</span>
+                        <InputSelect @bind-Value="NewBoard.WorkspaceId">
+                            @foreach (var workspace in _workspaces)
+                            {
+                                <option value="@workspace.Id">@workspace.Name</option>
+                            }
+                        </InputSelect>
+                    </label>
+                    <button type="submit" class="btn-primary">Create</button>
+                </div>
+            </EditForm>
+        </section>
+    }
+
+    @if (CanManageMembers)
+    {
+        <section class="panel">
+            <h2>Invite someone</h2>
+            <EditForm Model="Invite" FormName="invite" method="post" OnValidSubmit="InviteAsync">
+                <DataAnnotationsValidator />
+                <div class="form-row">
+                    <label class="field">
+                        <span>Email</span>
+                        <InputText @bind-Value="Invite.Email" type="email" required />
+                    </label>
+                    <label class="field">
+                        <span>Role</span>
+                        <InputSelect @bind-Value="Invite.Role">
+                            <option value="@TenantRole.Member">Member</option>
+                            <option value="@TenantRole.Viewer">Viewer</option>
+                            <option value="@TenantRole.Guest">Guest</option>
+                        </InputSelect>
+                    </label>
+                    <button type="submit" class="btn-primary">Invite</button>
+                </div>
+            </EditForm>
+        </section>
+    }
+</main>
+
+@code {
+    private IReadOnlyList<BoardCard> _boards = [];
+    private IReadOnlyList<WorkspaceChoice> _workspaces = [];
+    private string? _notice;
+    private string? _error;
+
+    [SupplyParameterFromForm(FormName = "create-board")]
+    private NewBoardInput NewBoard { get; set; } = new();
+
+    [SupplyParameterFromForm(FormName = "invite")]
+    private InviteInput Invite { get; set; } = new();
+
+    private bool CanCreate => Tenant.Role is { } role && PermissionSnapshot.For(role).Can(Capability.CreateBoard);
+
+    private bool CanManageMembers => Tenant.Role is { } role && PermissionSnapshot.For(role).Can(Capability.ManageMembers);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Tenant.UserId is not { } userId || Tenant.Role is not { } role || Tenant.TenantId is not { } tenantId)
+        {
+            return;
+        }
+
+        _boards = await Queries.GetVisibleBoardsAsync(userId, role);
+        _workspaces = await Queries.GetWorkspaceChoicesAsync();
+    }
+
+    private async Task CreateBoardAsync()
+    {
+        _error = null;
+        _notice = null;
+
+        if (Tenant.UserId is not { } userId || Tenant.TenantId is not { } tenantId || !CanCreate)
+        {
+            _error = "Your role cannot create boards.";
+            return;
+        }
+
+        if (!_workspaces.Any(workspace => workspace.Id == NewBoard.WorkspaceId))
+        {
+            _error = "Choose a workspace you can see.";
+            return;
+        }
+
+        var board = Tuesday.Domain.Workspaces.Board.Create(
+            tenantId,
+            NewBoard.WorkspaceId,
+            NewBoard.Name,
+            Tuesday.Domain.Workspaces.BoardType.Main,
+            userId);
+
+        Db.Boards.Add(board);
+        Db.AuditEntries.Add(Tuesday.Domain.Auditing.AuditEntry.Record(
+            tenantId, userId, "board.created", nameof(Tuesday.Domain.Workspaces.Board), board.Id.ToString(), board.Name));
+
+        await Db.SaveChangesAsync();
+
+        _notice = $"Board \"{board.Name}\" created.";
+        NewBoard = new();
+
+        if (Tenant.Role is { } role)
+        {
+            _boards = await Queries.GetVisibleBoardsAsync(userId, role);
+        }
+    }
+
+    private async Task InviteAsync()
+    {
+        _error = null;
+        _notice = null;
+
+        if (Tenant.UserId is not { } actorId || Tenant.TenantId is not { } tenantId || !CanManageMembers)
+        {
+            _error = "Your role cannot invite people.";
+            return;
+        }
+
+        var email = Invite.Email.Trim();
+        var user = await Users.FindByEmailAsync(email);
+
+        if (user is null)
+        {
+            user = new ApplicationUser
+            {
+                UserName = email,
+                Email = email,
+                EmailConfirmed = true,
+                DisplayName = email.Split('@')[0]
+            };
+
+            var created = await Users.CreateAsync(user, "Tuesday!Demo1");
+            if (!created.Succeeded)
+            {
+                _error = string.Join("; ", created.Errors.Select(error => error.Description));
+                return;
+            }
+        }
+
+        var existing = await Resolver.HasMembershipAsync(tenantId, user.Id);
+
+        if (existing)
+        {
+            _notice = $"{email} is already in this tenant.";
+            return;
+        }
+
+        Db.Memberships.Add(Tuesday.Domain.Tenancy.Membership.Create(tenantId, user.Id, Invite.Role));
+        Db.AuditEntries.Add(Tuesday.Domain.Auditing.AuditEntry.Record(
+            tenantId, actorId, "membership.invited", nameof(Tuesday.Domain.Tenancy.Membership), user.Id.ToString(), Invite.Role.ToString()));
+
+        await Db.SaveChangesAsync();
+
+        Logger.LogInformation("Invited {Email} as {Role}.", email, Invite.Role);
+        _notice = $"{email} added as {Invite.Role}. Temporary password: Tuesday!Demo1";
+        Invite = new();
+    }
+
+    public sealed class NewBoardInput
+    {
+        [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.StringLength(200)]
+        public string Name { get; set; } = string.Empty;
+
+        public Guid WorkspaceId { get; set; }
+    }
+
+    public sealed class InviteInput
+    {
+        [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        public TenantRole Role { get; set; } = TenantRole.Viewer;
+    }
+}

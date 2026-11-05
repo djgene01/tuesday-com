@@ -1,0 +1,127 @@
+@page "/login"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Tuesday.Infrastructure.Identity
+@attribute [AllowAnonymous]
+@inject SignInManager<ApplicationUser> SignInManager
+@inject NavigationManager Navigation
+
+<PageTitle>Sign in — Tuesday.com</PageTitle>
+
+<main class="auth-shell">
+    <section class="auth-card">
+        <p class="eyebrow">Tuesday.com</p>
+        <h1>Sign in</h1>
+        <p class="lede">Use your work account. Access is scoped to your tenant and role.</p>
+
+        @if (_error is not null)
+        {
+            <p class="alert alert-bad" role="alert">@_error</p>
+        }
+
+        @if (!_requiresTwoFactor)
+        {
+            <EditForm Model="Credentials" FormName="login" method="post" OnValidSubmit="SignInAsync">
+                <DataAnnotationsValidator />
+
+                <label class="field">
+                    <span>Email</span>
+                    <InputText @bind-Value="Credentials.Email" type="email" autocomplete="username" required />
+                </label>
+
+                <label class="field">
+                    <span>Password</span>
+                    <InputText @bind-Value="Credentials.Password" type="password" autocomplete="current-password" required />
+                </label>
+
+                <button type="submit" class="btn-primary">Sign in</button>
+            </EditForm>
+        }
+        else
+        {
+            @* A plain form: the code is submitted once to its own endpoint, which never
+               renders it back. EditForm is not used for this step. *@
+            <form method="post" action="/login/totp" name="totp">
+                <AntiforgeryToken />
+                <p class="meta">Enter the six-digit code from your authenticator app.</p>
+
+                <label class="field">
+                    <span>Authenticator code</span>
+                    <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required />
+                </label>
+
+                <button type="submit" class="btn-primary">Verify</button>
+            </form>
+        }
+
+        <p class="meta">Development accounts: admin@@, member@@, viewer@@, guest@@tuesday.local — password <code>Tuesday!Demo1</code>.</p>
+    </section>
+</main>
+
+@code {
+    private string? _error;
+    private bool _requiresTwoFactor;
+
+    [SupplyParameterFromForm(FormName = "login")]
+    private LoginForm Credentials { get; set; } = new();
+
+    [CascadingParameter]
+    private HttpContext? Http { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // The password step redirects here with step=totp once Identity reports a pending
+        // second factor; the pending user rides in its own identity cookie.
+        _requiresTwoFactor = Http?.Request.Query["step"].ToString() == "totp";
+
+        _error = Http?.Request.Query["error"].ToString() switch
+        {
+            "code" => "That code was not accepted. Check the clock on your device.",
+            "locked" => "This account is temporarily locked after repeated failures.",
+            "empty" => "Enter the code from your authenticator app.",
+            _ => null
+        };
+    }
+
+    private async Task SignInAsync()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(Credentials.Email) || string.IsNullOrEmpty(Credentials.Password))
+        {
+            _error = "Enter your email and password.";
+            return;
+        }
+
+        var result = await SignInManager.PasswordSignInAsync(
+            Credentials.Email.Trim(),
+            Credentials.Password,
+            isPersistent: true,
+            lockoutOnFailure: true);
+
+        if (result.Succeeded)
+        {
+            Navigation.NavigateTo("/workspace", forceLoad: true);
+            return;
+        }
+
+        if (result.RequiresTwoFactor)
+        {
+            Navigation.NavigateTo("/login?step=totp", forceLoad: true);
+            return;
+        }
+
+        _error = result.IsLockedOut
+            ? "This account is temporarily locked after repeated failures."
+            : "Email or password is incorrect.";
+    }
+
+    public sealed class LoginForm
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Email { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Password { get; set; } = string.Empty;
+    }
+}

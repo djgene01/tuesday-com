@@ -1,0 +1,6 @@
+flowchart LR
+    G["Grid component<br/>virtualised"] --> W["Value writer<br/>JSON + projections"]
+    W --> DB[("Item,<br/>ItemColumnValue")]
+    DB --> P["Indexes<br/>status, date, number"]
+    P --> R["Reload shows<br/>persisted edit"]
+    R --> K["100k checkpoint<br/>p95 under 3 s"]

@@ -1,0 +1,16 @@
+flowchart TD
+    A["Integration event<br/>from outbox"] --> B["Load enabled recipes<br/>for board"]
+    B --> C{"Trigger kind<br/>matches?"}
+    C -->|"no"| Z["Stop"]
+    C -->|"yes"| D{"Quota available?"}
+    D -->|"no"| Q["Refuse execution<br/>notify admin"]
+    D -->|"yes"| E{"Depth limit<br/>exceeded?"}
+    E -->|"yes"| L["LoopPrevented<br/>log run"]
+    E -->|"no"| F["Materialise item snapshot"]
+    F --> G{"All conditions<br/>true?"}
+    G -->|"no"| Z
+    G -->|"yes"| H["Execute next action"]
+    H --> I["Record action result<br/>failure isolated"]
+    I --> J{"More actions?"}
+    J -->|"yes"| H
+    J -->|"no"| K["Write run log<br/>increment quota"]

@@ -1,0 +1,41 @@
+flowchart TB
+    subgraph CLIENT["Client"]
+        BR["Browser<br/>DOM + 4 ES modules"]
+    end
+    subgraph HOST["Tuesday.Web - host"]
+        SSR["Static SSR pages<br/>auth, landing, search"]
+        IS["Interactive Server<br/>board, views, admin"]
+        API["REST API v1<br/>quota, idempotency"]
+        HUB["SignalR hub<br/>board and item groups"]
+    end
+    subgraph APP["Tuesday.Application"]
+        UC["Use cases"]
+        AUTHZ["Permission snapshot<br/>and policies"]
+        VAL["Validation"]
+        AUTO["Automation<br/>trigger, condition, action"]
+    end
+    subgraph DOM["Tuesday.Domain"]
+        ENT["Entities and invariants"]
+        EVT["Domain events"]
+    end
+    subgraph INF["Tuesday.Infrastructure"]
+        EF["EF Core 10<br/>MySQL provider"]
+        OUT["Transactional outbox"]
+        STORE["File store, SMTP, Redis"]
+    end
+    DB[("MySQL 8.4")]
+    BR --> SSR
+    BR --> IS
+    BR --> API
+    IS --> UC
+    API --> UC
+    HUB --> UC
+    UC --> AUTHZ
+    UC --> VAL
+    UC --> ENT
+    ENT --> EVT
+    UC --> EF
+    EVT --> OUT
+    UC --> STORE
+    EF --> DB
+    OUT --> DB

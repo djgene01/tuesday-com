@@ -1,0 +1,131 @@
+@page "/account/tokens"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Tuesday.Application.Tenancy
+@using Tuesday.Infrastructure.Automations
+@using Tuesday.Web.Security
+@attribute [Authorize]
+@inject ApiTokenService Tokens
+@inject ITenantContext Tenant
+@inject TenantContextBootstrapper Bootstrapper
+
+<PageTitle>API tokens — Tuesday.com</PageTitle>
+
+<main class="shell">
+    <p class="eyebrow">Your account</p>
+    <h1>API tokens</h1>
+    <p class="lede">A token calls <code>/api/v1</code> as you. It is shown once, stored hashed, and can be revoked here at any time.</p>
+
+    <div class="composer">
+        <label class="field">
+            <span>Token name</span>
+            <input type="text" @bind="_name" @bind:event="oninput" placeholder="CI import" aria-label="Token name" />
+        </label>
+        <div class="composer-actions">
+            <p class="meta">Requests are limited to 120 per minute per token.</p>
+            <button type="button" class="btn" disabled="@(string.IsNullOrWhiteSpace(_name) || _busy)" @onclick="IssueAsync">
+                Create token
+            </button>
+        </div>
+    </div>
+
+    @if (_issued is not null)
+    {
+        <div class="alert alert-good" role="status">
+            <strong>Copy it now — it is not shown again.</strong>
+            <code class="token-value">@_issued</code>
+        </div>
+    }
+
+    @if (_error is not null)
+    {
+        <p class="alert alert-bad" role="alert">@_error</p>
+    }
+
+    @if (_rows is null)
+    {
+        <p class="meta">Loading…</p>
+    }
+    else if (_rows.Count == 0)
+    {
+        <p class="meta">No tokens yet.</p>
+    }
+    else
+    {
+        <ul class="file-list">
+            @foreach (var row in _rows)
+            {
+                <li>
+                    <span class="file-name">@row.Name</span>
+                    <span class="meta">@row.Prefix… @(row.IsActive ? "active" : "revoked") · created @row.CreatedAt.ToLocalTime().ToString("d MMM yyyy")</span>
+                    @if (row.IsActive)
+                    {
+                        <button type="button" class="btn-quiet" @onclick="() => RevokeAsync(row.Id)" disabled="@_busy">Revoke</button>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</main>
+
+@code {
+    private IReadOnlyList<ApiTokenRow>? _rows;
+    private string _name = string.Empty;
+    private string? _issued;
+    private string? _error;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Bootstrapper.EnsureResolvedAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _rows = Tenant.UserId is { } userId ? await Tokens.ListAsync(userId) : [];
+    }
+
+    private async Task IssueAsync()
+    {
+        if (Tenant.UserId is not { } userId || Tenant.TenantId is not { } tenantId)
+        {
+            _error = "Your session has no tenant identity.";
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+
+        try
+        {
+            var (plaintext, _) = await Tokens.IssueAsync(tenantId, userId, _name);
+            _issued = plaintext;
+            _name = string.Empty;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RevokeAsync(Guid id)
+    {
+        if (Tenant.UserId is not { } userId)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            await Tokens.RevokeAsync(userId, id);
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

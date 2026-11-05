@@ -1,0 +1,67 @@
+@page "/board/{Id:guid}"
+@using Microsoft.AspNetCore.Authorization
+@using Tuesday.Application.Tenancy
+@using Tuesday.Infrastructure.Queries
+@using Tuesday.Web.Components.Board
+@using Tuesday.Web.Components.Views
+@attribute [Authorize(Policy = "capability:ViewWorkspace")]
+@inject WorkspaceQueries Queries
+@inject ITenantContext Tenant
+@inject IHttpContextAccessor HttpContextAccessor
+
+<PageTitle>@(_board?.Name ?? "Not found") — Tuesday.com</PageTitle>
+
+@if (_board is null)
+{
+    <main class="shell">
+        <p class="eyebrow">404</p>
+        <h1>Board not found</h1>
+        <p class="lede">Either it does not exist, or it is not shared with you.</p>
+        <p><a href="/workspace">Back to your workspace</a></p>
+    </main>
+}
+else
+{
+    <main class="board-shell">
+        <p class="eyebrow">@_board.WorkspaceName · @_board.Type</p>
+        <div class="board-head">
+            <h1>@_board.Name</h1>
+            <a class="board-action" href="/board/@Id/dashboard">Dashboard</a>
+            @if (!_board.CanEdit)
+            {
+                <span class="tag tag-quiet">Read-only</span>
+            }
+        </div>
+
+        <BoardViewsHost BoardId="Id" CanEdit="_board.CanEdit" @rendermode="InteractiveServer" />
+    </main>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private BoardCard? _board;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Tenant.UserId is not { } userId || Tenant.Role is not { } role)
+        {
+            return;
+        }
+
+        _board = await Queries.FindBoardAsync(Id, userId, role);
+
+        if (_board is null && HttpContextAccessor.HttpContext is { } context)
+        {
+            // 404, not 403: an ungranted guest must not learn that the board exists.
+            // Applied on OnStarting: setting a 4xx status before the render completes makes
+            // Blazor discard the body, which left the browser showing its own error page.
+            context.Response.OnStarting(() =>
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return Task.CompletedTask;
+            });
+        }
+    }
+}

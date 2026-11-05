@@ -1,0 +1,122 @@
+@using Tuesday.Domain.Collaboration
+@using Tuesday.Application.Collaboration
+@using Tuesday.Application.Tenancy
+@using Tuesday.Infrastructure.Collaboration
+@using Tuesday.Web.Collaboration
+@using Tuesday.Web.Security
+@inject AttachmentService Files
+@inject AttachmentLinks Links
+@inject ITenantContext Tenant
+@inject TenantContextBootstrapper Bootstrapper
+
+<section class="attachments" aria-label="Attachments">
+    <header class="thread-head">
+        <h2>Attachments</h2>
+        <p class="meta">@(_rows is null ? "Loading" : $"{_rows.Count} file{(_rows.Count == 1 ? string.Empty : "s")}")</p>
+    </header>
+
+    @if (CanEdit)
+    {
+        <div class="composer">
+            <label class="field">
+                <span>Add a file (up to 25 MB)</span>
+                <InputFile OnChange="UploadAsync" class="file-input" />
+            </label>
+            <p class="meta">Files are private to this item. Links expire after one hour.</p>
+        </div>
+    }
+
+    @if (_error is not null)
+    {
+        <p class="alert alert-bad" role="alert">@_error</p>
+    }
+
+    @if (_rows is { Count: 0 })
+    {
+        <p class="meta">No files yet.</p>
+    }
+    else if (_rows is not null)
+    {
+        <ul class="file-list">
+            @foreach (var row in _rows)
+            {
+                <li>
+                    <span class="file-name">@row.FileName</span>
+                    <span class="meta">@Size(row.ByteSize) · @row.CreatedAt.ToLocalTime().ToString("d MMM, HH:mm")</span>
+                    <a class="row-open" href="@DownloadHref(row)" download>Download</a>
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public Guid BoardId { get; set; }
+
+    [Parameter, EditorRequired]
+    public Guid ItemId { get; set; }
+
+    [Parameter]
+    public bool CanEdit { get; set; }
+
+    private IReadOnlyList<AttachmentRow>? _rows;
+    private string? _error;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Bootstrapper.EnsureResolvedAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() => _rows = await Files.ListAsync(ItemId);
+
+    private async Task UploadAsync(InputFileChangeEventArgs change)
+    {
+        if (!CanEdit || Tenant.UserId is not { } userId || Tenant.TenantId is not { } tenantId || _busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+
+        try
+        {
+            var file = change.File;
+
+            await using var stream = file.OpenReadStream(Attachment.MaxBytes);
+            var result = await Files.SaveAsync(
+                tenantId, BoardId, ItemId, userId, file.Name, file.ContentType, file.Size, stream);
+
+            if (!result.Succeeded)
+            {
+                _error = result.Error;
+                return;
+            }
+
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            _error = exception is InvalidOperationException
+                ? "That file is larger than the 25 MB limit."
+                : "The upload failed: " + exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private string DownloadHref(AttachmentRow row) =>
+        $"/attachments/{row.Id:D}?t={Links.Create(row.Id, BoardId, ItemId, TimeSpan.FromHours(1))}";
+
+    private static string Size(long bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024.0:0.#} KB",
+        _ => $"{bytes / (1024.0 * 1024.0):0.#} MB"
+    };
+}

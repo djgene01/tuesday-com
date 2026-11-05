@@ -1,0 +1,261 @@
+@page "/account/security"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Tuesday.Infrastructure.Identity
+@using Tuesday.Web.Security
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject UserManager<ApplicationUser> Users
+@inject SignInManager<ApplicationUser> SignIn
+@inject NavigationManager Navigation
+
+<PageTitle>Account security — Tuesday.com</PageTitle>
+
+<section class="page">
+    <p class="eyebrow">Your account</p>
+    <h1>Account security</h1>
+    <p class="lede">A second factor protects your session, your API tokens and the board data your role can reach.</p>
+
+    @if (_message is not null)
+    {
+        <p class="alert alert-good" role="status">@_message</p>
+    }
+
+    @if (_error is not null)
+    {
+        <p class="alert alert-bad" role="alert">@_error</p>
+    }
+
+    @if (_userId is null)
+    {
+        <p class="meta">Loading…</p>
+    }
+    else if (_enabled)
+    {
+        <div class="panel">
+            <h2>Authenticator app</h2>
+            <p class="meta">Two-factor authentication is <strong>on</strong>. You will be asked for a six-digit code when you sign in.</p>
+
+            @if (_recoveryCodes is not null)
+            {
+                <h3>Recovery codes</h3>
+                <p class="meta">Store these somewhere safe. Each one works once, and they replace any earlier set.</p>
+                <ul class="code-list">
+                    @foreach (var recoveryCode in _recoveryCodes)
+                    {
+                        <li><code>@recoveryCode</code></li>
+                    }
+                </ul>
+            }
+
+            <button type="button" class="btn" @onclick="RegenerateCodesAsync" disabled="@_busy">Generate new recovery codes</button>
+            <button type="button" class="btn-quiet" @onclick="DisableAsync" disabled="@_busy">Turn off two-factor</button>
+        </div>
+    }
+    else
+    {
+        <div class="panel">
+            <h2>Authenticator app</h2>
+            <p class="meta">Two-factor authentication is <strong>off</strong>. Enrol an authenticator app (1Password, Google Authenticator, Authy) to turn it on.</p>
+            <button type="button" class="btn-primary" @onclick="BeginEnrolmentAsync" disabled="@_busy">Set up authenticator</button>
+
+            @if (_sharedKey is not null)
+            {
+                <div class="enrol">
+                    <p class="meta">Add this key to your app, then enter the current six-digit code.</p>
+                    <p class="enrol-key"><code>@FormatKey(_sharedKey)</code></p>
+                    <p class="meta">Or open this link on the device: <code class="uri">@_authenticatorUri</code></p>
+
+                    <label class="field">
+                        <span>Verification code</span>
+                        <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code"
+                               @bind="_code" @bind:event="oninput" maxlength="7" />
+                    </label>
+
+                    <button type="button" class="btn-primary" @onclick="ConfirmEnrolmentAsync" disabled="@_busy">Verify and turn on</button>
+                </div>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private string? _message;
+    private string? _error;
+    private bool _busy;
+    private bool _enabled;
+    private Guid? _userId;
+    private string? _sharedKey;
+    private string? _authenticatorUri;
+    private string _code = string.Empty;
+    private string[]? _recoveryCodes;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await CurrentAsync();
+
+        if (user is null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        _userId = user.Id;
+        _enabled = await Users.GetTwoFactorEnabledAsync(user);
+    }
+
+    private async Task<ApplicationUser?> CurrentAsync()
+    {
+        if (AuthState is null)
+        {
+            return null;
+        }
+
+        var state = await AuthState;
+        return await Users.GetUserAsync(state.User);
+    }
+
+    private async Task BeginEnrolmentAsync()
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+
+        try
+        {
+            var user = await CurrentAsync();
+
+            if (user is null)
+            {
+                _error = "Your session expired. Sign in again.";
+                return;
+            }
+
+            _sharedKey = await Users.GetAuthenticatorKeyAsync(user);
+
+            if (string.IsNullOrEmpty(_sharedKey))
+            {
+                await Users.ResetAuthenticatorKeyAsync(user);
+                _sharedKey = await Users.GetAuthenticatorKeyAsync(user);
+            }
+
+            _authenticatorUri = TotpUri("Tuesday.com", user.Email ?? user.UserName ?? "account", _sharedKey!);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ConfirmEnrolmentAsync()
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+
+        try
+        {
+            var user = await CurrentAsync();
+
+            if (user is null)
+            {
+                _error = "Your session expired. Sign in again.";
+                return;
+            }
+
+            // Spaces are what people type when the app shows "123 456".
+            var code = _code.Replace(" ", string.Empty, StringComparison.Ordinal).Trim();
+            var result = await Users.VerifyTwoFactorTokenAsync(
+                user, TokenOptions.DefaultAuthenticatorProvider, code);
+
+            if (!result)
+            {
+                _error = "That code was not accepted. Check the clock on your device.";
+                return;
+            }
+
+            await Users.SetTwoFactorEnabledAsync(user, true);
+            _enabled = true;
+            _sharedKey = null;
+            _authenticatorUri = null;
+            _code = string.Empty;
+            _recoveryCodes = (await Users.GenerateNewTwoFactorRecoveryCodesAsync(user, 10))?.ToArray();
+            _message = "Two-factor authentication is on. Save your recovery codes.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RegenerateCodesAsync()
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+
+        try
+        {
+            var user = await CurrentAsync();
+
+            if (user is null)
+            {
+                _error = "Your session expired. Sign in again.";
+                return;
+            }
+
+            _recoveryCodes = (await Users.GenerateNewTwoFactorRecoveryCodesAsync(user, 10))?.ToArray();
+            _message = "New recovery codes generated. The previous set no longer works.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DisableAsync()
+    {
+        _busy = true;
+        _error = null;
+        _message = null;
+
+        try
+        {
+            var user = await CurrentAsync();
+
+            if (user is null)
+            {
+                _error = "Your session expired. Sign in again.";
+                return;
+            }
+
+            await Users.SetTwoFactorEnabledAsync(user, false);
+            await Users.ResetAuthenticatorKeyAsync(user);
+            _enabled = false;
+            _recoveryCodes = null;
+            _message = "Two-factor authentication is off.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string FormatKey(string key) =>
+        string.Join(' ', key.ToCharArray().Chunk(4).Select(part => new string(part)));
+
+    /// <summary>
+    /// The otpauth URI an authenticator app scans. TotpUri lives in Web because it is a
+    /// presentation concern; the generator and validator stay in Identity.
+    /// </summary>
+    private static string TotpUri(string issuer, string account, string key)
+    {
+        var label = Uri.EscapeDataString(issuer + ":" + account);
+        var secret = Uri.EscapeDataString(key);
+
+        return $"otpauth://totp/{label}?secret={secret}&issuer={Uri.EscapeDataString(issuer)}&digits=6&period=30";
+    }
+}

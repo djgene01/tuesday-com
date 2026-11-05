@@ -1,0 +1,20 @@
+flowchart LR
+    subgraph SSR["Static SSR - no circuit"]
+        L["Sign in, MFA, reset"]
+        M["Landing page"]
+        S["Search results"]
+        E["Error pages"]
+    end
+    subgraph ISR["Interactive Server - circuit per user"]
+        B["Board grid"]
+        V["Kanban, Calendar,<br/>Timeline, Gantt"]
+        A["Admin and settings"]
+        I["Inbox"]
+        D["Dashboards"]
+    end
+    subgraph OFF["Not used"]
+        AUTO["InteractiveAuto<br/>WASM payload not repaid"]
+        WASM["Standalone WebAssembly"]
+    end
+    SSR -->|"sign-in sets cookie"| ISR
+    ISR -->|"security stamp changes<br/>circuit force-closed"| SSR

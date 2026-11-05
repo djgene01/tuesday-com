@@ -1,0 +1,13 @@
+flowchart LR
+    P0["P0 Foundations<br/>2-3 pw"] --> P1["P1 Identity and tenancy<br/>4-6 pw"]
+    P1 --> P2["P2 Board core<br/>9-12 pw"]
+    P2 --> P3["P3 Views<br/>8-11 pw"]
+    P3 --> P4["P4 Collaboration<br/>4-6 pw"]
+    P4 --> P5["P5 Automations and API<br/>6-9 pw"]
+    P5 --> P6["P6 Dashboards and release<br/>4-6 pw"]
+    G1{{"Gate: isolation suite green"}}
+    G2{{"Gate: 100k checkpoint"}}
+    G3{{"Gate: integrator succeeds"}}
+    P1 -.-> G1
+    P2 -.-> G2
+    P5 -.-> G3

@@ -1,0 +1,11 @@
+flowchart LR
+    U["Members, Admins,<br/>Viewers, Guests"] -->|"HTTPS"| PX["Reverse proxy<br/>nginx or IIS ARR"]
+    PX -->|"HTTP + WebSocket upgrade"| WEB["Tuesday.com web<br/>Blazor SSR + Interactive Server<br/>REST API + SignalR hub"]
+    WEB -->|"EF Core 10"| DB[("MySQL 8.4<br/>system of record")]
+    WEB -->|"pub/sub + cache"| RD[("Redis 7<br/>backplane, key ring")]
+    WEB -->|"read/write"| FS[("Attachment store<br/>volume or S3-compatible")]
+    WEB -->|"SMTP"| MAIL["SMTP relay"]
+    WEB -->|"signed POST"| HOOK["External webhook<br/>endpoints"]
+    WK["Tuesday.com worker<br/>outbox, scheduler, delivery"] --> DB
+    WK --> RD
+    IDP["Optional OIDC<br/>identity provider"] -.->|"federation"| WEB

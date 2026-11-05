@@ -1,0 +1,27 @@
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant PX as Proxy
+    participant AU as Auth
+    participant TN as Tenant context
+    participant PS as Permission snapshot
+    participant UC as Use case
+    participant DB as MySQL
+    participant OB as Outbox relay
+    participant HU as SignalR
+    U->>PX: Request board page
+    PX->>AU: Validate cookie or bearer token
+    AU-->>TN: Principal with membership claim
+    TN->>PS: Resolve tenant, load grants
+    Note over PS: four indexed reads<br/>role, workspace, board, item
+    PS-->>UC: Effective permission
+    UC->>UC: Validate command
+    UC->>DB: Begin transaction
+    UC->>DB: Write state, outbox, audit
+    DB-->>UC: Commit
+    UC-->>HU: Notify board group
+    HU-->>U: Live update to other clients
+    UC-->>U: Rendered response
+    Note over OB,DB: asynchronous relay, after commit
+    OB->>DB: Poll undelivered outbox
+    OB->>OB: Dispatch integration events

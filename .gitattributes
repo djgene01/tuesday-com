@@ -1,0 +1,16 @@
+# Normalise line endings on commit, keep them native on checkout.
+* text=auto eol=lf
+
+# Windows-friendly scripts
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.pfx binary

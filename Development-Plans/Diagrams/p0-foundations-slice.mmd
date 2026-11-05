@@ -1,0 +1,6 @@
+flowchart LR
+    S["Solution<br/>7 projects, net10.0"] --> C["Release build<br/>warnings as errors"]
+    C --> H["Host starts<br/>config validated"]
+    H --> HP["health/ready<br/>MySQL and Redis"]
+    HP --> PG["Static page<br/>visibly renders"]
+    PG --> CI["CI: build, unit,<br/>licence and secret scan"]

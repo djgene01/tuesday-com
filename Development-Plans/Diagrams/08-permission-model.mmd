@@ -1,0 +1,12 @@
+flowchart TD
+    R["Tenant role<br/>Admin, Member, Viewer, Guest"] --> X{"Intersection"}
+    W["Workspace visibility<br/>open, closed, private"] --> X
+    B["Board grant<br/>view, edit, owner"] --> X
+    I["Item scope<br/>guest grant, subscription"] --> X
+    C["Column restriction<br/>post 1.0"] -.-> X
+    X --> E["Effective permission<br/>for one request"]
+    E --> P["Policy decision<br/>BoardRead, BoardEdit, TenantAdmin"]
+    P --> Y{"Allowed?"}
+    Y -->|"visible, not permitted"| F["403 Forbidden"]
+    Y -->|"not visible"| N["404 Not Found"]
+    Y -->|"permitted"| OK["Execute use case"]

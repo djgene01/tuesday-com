@@ -1,0 +1,97 @@
+@page "/board/{BoardId:guid}/item/{ItemId:guid}"
+@using Microsoft.AspNetCore.Authorization
+@using Tuesday.Application.Boards
+@using Tuesday.Application.Tenancy
+@using Tuesday.Infrastructure.Queries
+@using Tuesday.Web.Components.Collaboration
+@attribute [Authorize(Policy = "capability:ViewWorkspace")]
+@inject WorkspaceQueries Boards
+@inject BoardQueries Queries
+@inject ITenantContext Tenant
+@inject IHttpContextAccessor HttpContextAccessor
+
+<PageTitle>@(_item?.Name ?? "Not found") — Tuesday.com</PageTitle>
+
+@if (_board is null || _item is null)
+{
+    <main class="shell">
+        <p class="eyebrow">404</p>
+        <h1>Item not found</h1>
+        <p class="lede">Either it does not exist, or it is not shared with you.</p>
+        <p><a href="/workspace">Back to your workspace</a></p>
+    </main>
+}
+else
+{
+    <main class="board-shell">
+        <p class="eyebrow">
+            <a href="/board/@BoardId">@_board.Name</a> · @_group?.Title
+        </p>
+
+        <div class="board-head">
+            <h1>@_item.Name</h1>
+            @if (!(_card?.CanEdit ?? false))
+            {
+                <span class="tag tag-quiet">Read-only</span>
+            }
+        </div>
+
+        <section class="item-fields" aria-label="Item values">
+            @foreach (var column in _board.Columns)
+            {
+                <div class="item-field">
+                    <span class="item-field-label">@column.Title</span>
+                    <span class="item-field-value">@ValueOf(column.Id)</span>
+                </div>
+            }
+        </section>
+
+        <UpdateThread BoardId="BoardId" ItemId="ItemId" CanEdit="_card?.CanEdit ?? false" @rendermode="InteractiveServer" />
+
+        <AttachmentPanel BoardId="BoardId" ItemId="ItemId" CanEdit="_card?.CanEdit ?? false" @rendermode="InteractiveServer" />
+    </main>
+}
+
+@code {
+    [Parameter]
+    public Guid BoardId { get; set; }
+
+    [Parameter]
+    public Guid ItemId { get; set; }
+
+    private BoardModel? _board;
+    private GroupView? _group;
+    private ItemView? _item;
+    private BoardCard? _card;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Tenant.UserId is not { } userId || Tenant.Role is not { } role)
+        {
+            return;
+        }
+
+        _card = await Boards.FindBoardAsync(BoardId, userId, role);
+
+        if (_card is null)
+        {
+            HttpContextAccessor.HttpContext?.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        _board = await Queries.GetAsync(BoardId);
+
+        _group = _board?.Groups.FirstOrDefault(group => group.Items.Any(candidate => candidate.Id == ItemId));
+        _item = _group?.Items.FirstOrDefault(candidate => candidate.Id == ItemId);
+
+        if (_item is null && HttpContextAccessor.HttpContext is { } context)
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+        }
+    }
+
+    private string ValueOf(Guid columnId) =>
+        _item is not null && _item.Cells.TryGetValue(columnId, out var value) && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : "—";
+}

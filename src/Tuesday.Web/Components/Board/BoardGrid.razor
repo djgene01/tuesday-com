@@ -1,0 +1,338 @@
+@using Tuesday.Application.Boards
+@using Tuesday.Domain.Boards
+@using Tuesday.Infrastructure.Queries
+@using Tuesday.Infrastructure.Values
+@using Tuesday.Web.Security
+@inject BoardQueries Queries
+@inject ColumnValueWriter Writer
+@using Tuesday.Domain.Automation
+@inject Tuesday.Infrastructure.Automations.AutomationService Automations
+@inject TenantContextBootstrapper Bootstrapper
+
+<div class="grid-toolbar">
+    <p class="meta">
+        @if (_board is null)
+        {
+            <text>Loading…</text>
+        }
+        else
+        {
+            <text>@_board.ItemCount items · @_board.Columns.Count columns</text>
+            @if (_rows.Count < _totalRows)
+            {
+                <span class="meta-note">· @_rows.Count of @_totalRows rows shown</span>
+            }
+        }
+    </p>
+    @if (_error is not null)
+    {
+        <p class="alert alert-bad" role="alert">@_error</p>
+    }
+    else if (_savedAt is not null)
+    {
+        <p class="saved" role="status">Saved @_savedAt.Value.ToLocalTime().ToString("HH:mm:ss")</p>
+    }
+</div>
+
+@if (_board is { ItemCount: 0 } empty)
+{
+    @* An empty board should say what to do next, not show a header with no rows under it. *@
+    <div class="grid-empty-state">
+        <p class="grid-empty-title">No items yet</p>
+        <p class="grid-empty-body">
+            @if (empty.Columns.Count == 0)
+            {
+                <text>This board has no columns. Add columns first, then items can be filled in.</text>
+            }
+            else
+            {
+                <text>This board has @empty.Columns.Count column@(empty.Columns.Count == 1 ? "" : "s") but no items.</text>
+            }
+        </p>
+    </div>
+}
+else if (_board is { } board)
+{
+    @* One table for the whole board: a single scroll area, one sticky header, and column
+       widths that agree across groups. Group titles are rows of that same table, which is
+       what makes a virtualised list possible without per-group scroll boxes. *@
+    <div class="grid-scroll grid-scroll-virtual">
+        <table class="grid">
+            <caption class="sr-only">@board.Name items by group</caption>
+            <thead>
+                <tr>
+                    <th class="col-open" scope="col"><span class="sr-only">Open</span></th>
+                    <th class="col-item" scope="col">Item</th>
+                    @foreach (var column in board.Columns)
+                    {
+                        <th scope="col">@column.Title</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                <Virtualize Items="_rows" Context="row" SpacerElement="tr" OverscanCount="8">
+                        @if (row.Group is not null)
+                        {
+                            <tr class="group-row" @key="row.Key">
+                                <td colspan="@(board.Columns.Count + 2)">
+                                    <span class="group-dot group-@row.Group.Colour" aria-hidden="true"></span>
+                                    <h2>@row.Group.Title</h2>
+                                    <span class="tag">@row.Group.Items.Count</span>
+                                </td>
+                            </tr>
+                        }
+                        else if (row.Item is not null)
+                        {
+                            <tr @key="row.Key">
+                                <td class="col-open">
+                                    <a class="row-open" href="@($"/board/{BoardId}/item/{row.Item.Id}")"
+                                       aria-label="@($"Open {row.Item.Name}")"><span aria-hidden="true">›</span></a>
+                                </td>
+                                <td class="col-item">
+                                    <input class="cell cell-item"
+                                           aria-label="Item name"
+                                           value="@NameInput(row.Item.Id)"
+                                           disabled="@(!CanEdit)"
+                                           @oninput="e => _pendingNames[row.Item.Id] = e.Value?.ToString()"
+                                           @onchange="_ => SaveNameAsync(row.Item.Id)"
+                                           @onkeydown="e => OnKeyAsync(e, row.Item.Id, Guid.Empty)" />
+                                </td>
+                                @foreach (var column in board.Columns)
+                                {
+                                    <td>
+                                        <input class="@CellClass(column, CellInput(row.Item.Id, column.Id))"
+                                               aria-label="@($"{row.Item.Name}: {column.Title}")"
+                                               value="@CellInput(row.Item.Id, column.Id)"
+                                               disabled="@(!CanEdit)"
+                                               @oninput="e => _pendingCells[(row.Item.Id, column.Id)] = e.Value?.ToString()"
+                                               @onchange="_ => SaveCellAsync(row.Item.Id, column.Id)"
+                                               @onkeydown="e => OnKeyAsync(e, row.Item.Id, column.Id)" />
+                                    </td>
+                                }
+                            </tr>
+                        }
+                </Virtualize>
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid BoardId { get; set; }
+
+    [Parameter]
+    public bool CanEdit { get; set; }
+
+    private BoardModel? _board;
+    // Committed values, rendered into the inputs.
+    private readonly Dictionary<(Guid, Guid), string?> _cells = [];
+    private readonly Dictionary<Guid, string?> _names = [];
+
+    // In-flight text. Kept separate from _cells/_names on purpose: if @oninput fed the
+    // value= attribute, every keystroke would re-render the input, reset the caret to the
+    // end and drop characters while a person types.
+    private readonly Dictionary<(Guid, Guid), string?> _pendingCells = [];
+    private readonly Dictionary<Guid, string?> _pendingNames = [];
+    private string? _error;
+    private DateTimeOffset? _savedAt;
+    private string? _lastFired;
+
+    // The flattened render list: one entry per group heading plus one per item. Virtualize
+    // walks this instead of the model, so an item row and a group row can share a table.
+    private List<GridRow> _rows = [];
+    private int _totalRows;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Bootstrapper.EnsureResolvedAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _board = await Queries.GetAsync(BoardId);
+
+        if (_board is null)
+        {
+            _rows = [];
+            _totalRows = 0;
+            return;
+        }
+
+        var rows = new List<GridRow>(_board.ItemCount + _board.Groups.Count);
+
+        foreach (var group in _board.Groups)
+        {
+            rows.Add(new GridRow($"g:{group.Id}", group, null));
+
+            foreach (var item in group.Items)
+            {
+                rows.Add(new GridRow($"i:{item.Id}", null, item));
+                _names[item.Id] = item.Name;
+
+                foreach (var column in _board.Columns)
+                {
+                    _cells[(item.Id, column.Id)] = item.Cells.TryGetValue(column.Id, out var value) ? value : null;
+                }
+            }
+        }
+
+        _rows = rows;
+        _totalRows = rows.Count;
+    }
+
+    private string? ItemName(ItemView item) =>
+        _names.TryGetValue(item.Id, out var value) ? value : item.Name;
+
+    /// <summary>
+    /// A cell's class follows its column type, so status, dates and numbers are visually
+    /// distinguishable without reading every word. Status also takes a semantic tone.
+    /// </summary>
+    private static string CellClass(ColumnView column, string? value) => column.Type switch
+    {
+        ColumnType.Status => "cell cell-typed cell-status status-" + StatusTone(value),
+        ColumnType.Date => "cell cell-typed cell-date",
+        ColumnType.Number => "cell cell-typed cell-number",
+        ColumnType.People => "cell cell-typed cell-people",
+        ColumnType.Dropdown => "cell cell-typed cell-tag",
+        _ => "cell cell-typed"
+    };
+
+    private static string StatusTone(string? value) => (value ?? string.Empty).Trim().ToLowerInvariant() switch
+    {
+        "done" => "done",
+        "stuck" => "stuck",
+        "working on it" => "working",
+        "not started" => "idle",
+        _ => "neutral"
+    };
+
+    private string? CellText(Guid itemId, Guid columnId) =>
+        _cells.TryGetValue((itemId, columnId), out var value) ? value : null;
+
+    /// <summary>The text in an input right now: pending if the person has typed, else committed.</summary>
+    private string? NameInput(Guid itemId) =>
+        _pendingNames.TryGetValue(itemId, out var pending) ? pending : ItemNameById(itemId);
+
+    private string? ItemNameById(Guid itemId) =>
+        _names.TryGetValue(itemId, out var value) ? value : null;
+
+    private string? CellInput(Guid itemId, Guid columnId) =>
+        _pendingCells.TryGetValue((itemId, columnId), out var pending) ? pending : CellText(itemId, columnId);
+
+    private async Task SaveNameAsync(Guid itemId)
+    {
+        if (!CanEdit)
+        {
+            return;
+        }
+
+        var name = NameInput(itemId);
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            _error = "An item needs a name.";
+            await RestoreAsync();
+            return;
+        }
+
+        var result = await Writer.RenameItemAsync(itemId, name);
+        await CompleteAsync(result);
+
+        if (result.Succeeded)
+        {
+            _names[itemId] = name;
+            _pendingNames.Remove(itemId);
+        }
+    }
+
+    private async Task SaveCellAsync(Guid itemId, Guid columnId)
+    {
+        if (!CanEdit)
+        {
+            return;
+        }
+
+        var value = CellInput(itemId, columnId);
+        var result = await Writer.SetAsync(itemId, columnId, value);
+        await CompleteAsync(result);
+
+        if (result.Succeeded)
+        {
+            _cells[(itemId, columnId)] = value;
+            _pendingCells.Remove((itemId, columnId));
+        }
+
+        if (result.Succeeded && _board is not null)
+        {
+            // Two handlers can report the same commit (change + keydown). Only the first
+            // sighting of a value runs automations, so a rule cannot fire twice for one edit.
+            var fingerprint = itemId.ToString("n") + "|" + columnId.ToString("n") + "|" + value;
+
+            if (_lastFired is null || !string.Equals(_lastFired, fingerprint, StringComparison.Ordinal))
+            {
+                _lastFired = fingerprint;
+
+                // Automations run after the write is committed, so a failing rule can never
+                // cost the person their edit.
+                await Automations.FireAsync(BoardId, itemId, AutomationTrigger.CellChanged, columnId, value);
+            }
+        }
+    }
+
+    private async Task CompleteAsync(ValueWriteResult result)
+    {
+        if (result.Succeeded)
+        {
+            _error = null;
+            _savedAt = DateTimeOffset.UtcNow;
+            return;
+        }
+
+        _error = result.Error;
+        await RestoreAsync();
+    }
+
+    private async Task RestoreAsync()
+    {
+        _cells.Clear();
+        _names.Clear();
+        _pendingCells.Clear();
+        _pendingNames.Clear();
+        await LoadAsync();
+    }
+
+    /// <summary>
+    /// Enter commits, Escape reverts. Tab is left to the browser so the native focus
+    /// model keeps working — a custom focus model here would break screen readers.
+    /// </summary>
+    private async Task OnKeyAsync(KeyboardEventArgs args, Guid itemId, Guid columnId)
+    {
+        if (args.Key == "Escape")
+        {
+            await RestoreAsync();
+            return;
+        }
+
+        if (args.Key != "Enter")
+        {
+            return;
+        }
+
+        if (columnId == Guid.Empty)
+        {
+            await SaveNameAsync(itemId);
+        }
+        else
+        {
+            await SaveCellAsync(itemId, columnId);
+        }
+    }
+
+    /// <summary>
+    /// A single row of the flattened table. Exactly one of <paramref name="Group"/> and
+    /// <paramref name="Item"/> is set; <paramref name="Key"/> must stay stable so Virtualize
+    /// can reuse a row's DOM when the visible window moves.
+    /// </summary>
+    private sealed record GridRow(string Key, GroupView? Group, ItemView? Item);
+}

@@ -1,0 +1,23 @@
+@page "/not-found"
+@page "/{*path:nonfile}"
+@using Microsoft.AspNetCore.Http
+
+<PageTitle>Not found — Tuesday.com</PageTitle>
+
+<main class="shell">
+    <p class="eyebrow">404</p>
+    <h1>Not found</h1>
+    <p class="lede">That page does not exist, or it is not shared with you.</p>
+    <p><a href="/workspace">Back to your workspace</a></p>
+</main>
+
+@code {
+    /// <summary>The unmatched path, supplied by the catch-all route.</summary>
+    [Parameter]
+    public string? Path { get; set; }
+
+    // The 404 status is set by NotFoundStatusMiddleware, not here: assigning a 4xx status
+    // inside a Blazor SSR component makes the framework discard the rendered body, which
+    // produced an empty page that browsers replaced with their own "can't be found" screen.
+
+}

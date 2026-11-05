@@ -1,0 +1,8 @@
+flowchart LR
+    U["Update composer"] --> SAN["Sanitiser"]
+    SAN --> DB[("Update, Reply, Like")]
+    DB --> N["Notification fan-out"]
+    N --> IN["In-app bell"]
+    N --> EM["Email via SMTP"]
+    DB --> FT["FULLTEXT index"]
+    FT --> SR["Permission-filtered<br/>search results"]

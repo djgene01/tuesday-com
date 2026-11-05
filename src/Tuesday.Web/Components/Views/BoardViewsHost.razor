@@ -1,0 +1,201 @@
+@using Tuesday.Application.Boards
+@using Tuesday.Application.Views
+@using Tuesday.Domain.Boards
+@using Tuesday.Domain.Views
+@using Tuesday.Infrastructure.Queries
+@using Tuesday.Infrastructure.Views
+@using Tuesday.Web.Components.Board
+@using Tuesday.Web.Components.Views
+@using Tuesday.Web.Security
+@inject BoardQueries Queries
+@inject ViewService Views
+@inject DependencyService Dependencies
+@inject TenantContextBootstrapper Bootstrapper
+@inject NavigationManager Navigation
+
+<div class="view-tabs" role="tablist" aria-label="Board views">
+    @foreach (var view in _views)
+    {
+        var current = view.Id == _activeId;
+        <button type="button"
+                role="tab"
+                class="view-tab @(current ? "is-active" : null)"
+                aria-selected="@(current ? "true" : "false")"
+                @onclick="() => SelectAsync(view.Id)">
+            <span class="view-tab-name">@view.Name</span>
+            <span class="view-tab-kind">@Kind(view.Type)</span>
+        </button>
+    }
+    <p class="meta view-count">@_views.Count of @BoardView.MaxViewsPerBoard views</p>
+</div>
+
+@if (_error is not null)
+{
+    <p class="alert alert-bad" role="alert">@_error</p>
+}
+
+@if (_board is null)
+{
+    <p class="meta">Loading…</p>
+}
+else if (_active is null || _active.Type == ViewType.Grid)
+{
+    <BoardGrid BoardId="BoardId" CanEdit="CanEdit" />
+}
+else if (_active.Type == ViewType.Kanban)
+{
+    <KanbanView Board="_board"
+                StatusColumnId="_statusColumnId"
+                HideEmptyLanes="@ViewSettings.Flag(_active.SettingsJson, "hideEmptyLanes", true)"
+                CanEdit="CanEdit"
+                OnChanged="ReloadAsync" />
+}
+else if (_active.Type == ViewType.Calendar)
+{
+    <CalendarView Board="_board"
+                  DateColumnId="_dateColumnId"
+                  CanEdit="CanEdit"
+                  OnChanged="ReloadAsync" />
+}
+else if (_active.Type == ViewType.Timeline)
+{
+    <TimelineView Board="_board"
+                  StartColumnId="_startColumnId"
+                  EndColumnId="_endColumnId"
+                  CanEdit="CanEdit"
+                  OnChanged="ReloadAsync" />
+}
+else if (_active.Type == ViewType.Gantt)
+{
+    <GanttView Board="_board"
+               StartColumnId="_startColumnId"
+               EndColumnId="_endColumnId"
+               BoardId="BoardId"
+               CanEdit="CanEdit"
+               OnChanged="ReloadAsync" />
+}
+
+@code {
+    [Parameter]
+    public Guid BoardId { get; set; }
+
+    [Parameter]
+    public bool CanEdit { get; set; }
+
+    /// <summary>
+    /// The selected view lives in the URL, so a reload, a bookmark or a shared link opens
+    /// the same projection instead of falling back to the table.
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "view")]
+    public Guid? View { get; set; }
+
+    private BoardModel? _board;
+    private IReadOnlyList<ViewSummary> _views = [];
+    private ViewSummary? _active;
+    private Guid _activeId;
+    private Guid _statusColumnId;
+    private Guid _dateColumnId;
+    private Guid _startColumnId;
+    private Guid _endColumnId;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Bootstrapper.EnsureResolvedAsync();
+        await LoadAsync();
+        ApplySelection();
+    }
+
+    protected override void OnParametersSet()
+    {
+        // A tab click changes only the query string, so this is where a new selection lands.
+        if (_board is not null)
+        {
+            ApplySelection();
+        }
+    }
+
+    private void ApplySelection()
+    {
+        if (_views.Count == 0)
+        {
+            return;
+        }
+
+        _active = View is { } requested
+            ? _views.FirstOrDefault(view => view.Id == requested) ?? _views[0]
+            : _views[0];
+
+        _activeId = _active.Id;
+
+        if (_board is not null)
+        {
+            _statusColumnId = ColumnFor("statusColumnId", ColumnType.Status);
+            _dateColumnId = ColumnFor("dateColumnId", ColumnType.Date);
+            _startColumnId = _dateColumnId;
+            _endColumnId = ColumnFor("endColumnId", ColumnType.Date, skip: _dateColumnId);
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _board = await Queries.GetAsync(BoardId);
+        _views = await Views.ListAsync(BoardId);
+
+        if (_board is null)
+        {
+            return;
+        }
+
+        // Settings name columns by id; a view whose column has gone falls back to the
+        // first column of the matching type instead of rendering an empty view.
+        _statusColumnId = ColumnFor("statusColumnId", ColumnType.Status);
+        _dateColumnId = ColumnFor("dateColumnId", ColumnType.Date);
+        _startColumnId = _dateColumnId;
+        _endColumnId = ColumnFor("endColumnId", ColumnType.Date, skip: _dateColumnId);
+    }
+
+    private Guid ColumnFor(string key, ColumnType type, Guid? skip = null)
+    {
+        var configured = ViewSettings.Column(_active?.SettingsJson, key);
+        if (configured is { } id && _board?.Column(id) is not null)
+        {
+            return id;
+        }
+
+        if (key == "startColumnId" && _board?.Column(_dateColumnId) is not null)
+        {
+            return _dateColumnId;
+        }
+
+        var candidate = _board?.Columns
+            .Where(column => column.Type == type && column.Id != skip)
+            .Select(column => column.Id)
+            .FirstOrDefault();
+
+        return candidate ?? Guid.Empty;
+    }
+
+    private Task SelectAsync(Guid viewId)
+    {
+        _error = null;
+        Navigation.NavigateTo($"/board/{BoardId}?view={viewId}");
+        return Task.CompletedTask;
+    }
+
+    private async Task ReloadAsync()
+    {
+        await LoadAsync();
+    }
+
+    private static string Kind(ViewType type) => type switch
+    {
+        ViewType.Grid => "Table",
+        ViewType.Kanban => "Kanban",
+        ViewType.Calendar => "Calendar",
+        ViewType.Timeline => "Timeline",
+        ViewType.Gantt => "Gantt",
+        _ => "View"
+    };
+}

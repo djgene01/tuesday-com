@@ -1,0 +1,26 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Tuesday.com — a work operating system for boards, items and views." />
+    <meta name="color-scheme" content="light" />
+    <base href="/" />
+    <ResourcePreloader />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["Tuesday.Web.styles.css"]" />
+    <ImportMap />
+    <HeadOutlet />
+</head>
+
+<body>
+    @* Interactive components bring their own @rendermode, so the document itself stays
+       static. The auth forms are plain HTML posts and opt out of enhanced navigation with
+       data-enhance-nav="false", which stops Blazor rejecting a form it does not own. *@
+    <Routes />
+    <ReconnectModal />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+
+</html>

@@ -1,0 +1,89 @@
+@page "/search"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Tuesday.Application.Tenancy
+@using Tuesday.Infrastructure.Collaboration
+@using Tuesday.Infrastructure.Queries
+@using Tuesday.Web.Security
+@attribute [Authorize]
+@inject WorkspaceQueries Boards
+@inject SearchService Finder
+@inject ITenantContext Tenant
+@inject TenantContextBootstrapper Bootstrapper
+
+<PageTitle>Search — Tuesday.com</PageTitle>
+
+<main class="shell">
+    <p class="eyebrow">Everything you can see</p>
+    <h1>Search</h1>
+
+    <form class="search-bar" method="get" action="/search" role="search">
+        <label class="field">
+            <span class="sr-only">Search items and updates</span>
+            <input type="search" name="q" value="@Query" placeholder="Item names and update text" autofocus />
+        </label>
+        <button type="submit" class="btn">Search</button>
+    </form>
+
+    @if (string.IsNullOrWhiteSpace(Query))
+    {
+        <p class="lede">Search runs over the boards you can open — item names first, then what people wrote.</p>
+    }
+    else if (_hits is null)
+    {
+        <p class="meta">Loading…</p>
+    }
+    else if (_hits.Count == 0)
+    {
+        <p class="lede">Nothing matches “@Query”.</p>
+    }
+    else
+    {
+        <p class="meta">@_hits.Count result@(_hits.Count == 1 ? string.Empty : "s") for “@Query”</p>
+        <ul class="search-results">
+            @foreach (var hit in _hits)
+            {
+                <li>
+                    <span class="tag tag-quiet">@hit.Kind</span>
+                    <a href="@LinkFor(hit)">@hit.Title</a>
+                    <span class="meta">@hit.BoardName</span>
+                    @if (hit.Kind == "update")
+                    {
+                        <p class="meta">@hit.Snippet</p>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</main>
+
+@code {
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Query { get; set; }
+
+    private IReadOnlyList<SearchHit>? _hits;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Query))
+        {
+            _hits = null;
+            return;
+        }
+
+        await Bootstrapper.EnsureResolvedAsync();
+
+        if (Tenant.UserId is not { } userId || Tenant.Role is not { } role)
+        {
+            _hits = [];
+            return;
+        }
+
+        var boards = await Boards.GetVisibleBoardsAsync(userId, role);
+        _hits = await Finder.SearchAsync(boards.Select(board => board.Id).ToList(), Query);
+    }
+
+    private static string LinkFor(SearchHit hit) => hit.ItemId is { } itemId
+        ? $"/board/{hit.BoardId:D}/item/{itemId:D}"
+        : $"/board/{hit.BoardId:D}";
+}

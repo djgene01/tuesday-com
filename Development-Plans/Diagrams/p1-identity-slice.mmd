@@ -1,0 +1,7 @@
+flowchart LR
+    UI["Sign-in page<br/>static SSR"] --> ID["OpenIddict<br/>cookie + TOTP MFA"]
+    ID --> TN["Tenant context<br/>from membership claim"]
+    TN --> GR["Board grant<br/>resolution"]
+    GR --> POL["Policy check<br/>capability matrix"]
+    POL --> DB[("Account, Membership,<br/>Workspace, Board")]
+    DB --> EV["Audit row written<br/>isolation suite green"]

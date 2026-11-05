@@ -1,0 +1,20 @@
+erDiagram
+    ACCOUNT ||--o{ MEMBERSHIP : grants
+    USER ||--o{ MEMBERSHIP : holds
+    ACCOUNT ||--o{ WORKSPACE : owns
+    ACCOUNT ||--o{ API_TOKEN : issues
+    ACCOUNT ||--o{ AUDIT_EVENT : records
+    ACCOUNT ||--o{ WEBHOOK_SUBSCRIPTION : registers
+    WORKSPACE ||--o{ BOARD : contains
+    BOARD ||--o{ BOARD_COLUMN : defines
+    BOARD ||--o{ ITEM_GROUP : groups
+    BOARD ||--o{ BOARD_VIEW : presents
+    BOARD ||--o{ AUTOMATION : scopes
+    BOARD ||--o{ BOARD_GRANT : shares
+    ITEM_GROUP ||--o{ ITEM : holds
+    ITEM ||--o{ ITEM : parent_of
+    ITEM ||--o{ ITEM_COLUMN_VALUE : carries
+    BOARD_COLUMN ||--o{ ITEM_COLUMN_VALUE : types
+    ITEM ||--o{ UPDATE : discusses
+    AUTOMATION ||--o{ AUTOMATION_RUN : logs
+    WEBHOOK_SUBSCRIPTION ||--o{ WEBHOOK_DELIVERY : delivers

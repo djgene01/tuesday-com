@@ -1,0 +1,9 @@
+flowchart LR
+    T["Same board data"] --> K["Kanban<br/>status grouping"]
+    T --> C["Calendar<br/>date placement"]
+    T --> TL["Timeline<br/>two-date bars"]
+    T --> GA["Gantt<br/>dependency arrows"]
+    K --> D["Drag persists<br/>through value writer"]
+    C --> D
+    TL --> D
+    GA --> D

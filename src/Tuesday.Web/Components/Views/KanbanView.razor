@@ -1,0 +1,143 @@
+@using Tuesday.Application.Boards
+@using Tuesday.Application.Views
+@using Tuesday.Infrastructure.Values
+@inject ColumnValueWriter Writer
+
+@if (Lanes.Count == 0)
+{
+    <p class="meta">This board has no status column, so it cannot be grouped into lanes.</p>
+}
+else
+{
+    @if (_error is not null)
+    {
+        <p class="alert alert-bad" role="alert">@_error</p>
+    }
+
+    <div class="kanban" role="list" aria-label="Board by status">
+        @foreach (var lane in Lanes)
+        {
+            <section class="lane @(_hover == lane.Label ? "is-hover" : null)"
+                     role="listitem"
+                     aria-label="@($"{lane.Label} lane, {lane.Cards.Count} items")"
+                     @ondragover:preventDefault
+                     @ondragenter="() => _hover = lane.Label"
+                     @ondragleave="() => _hover = null"
+                     @ondrop="() => DropAsync(lane)">
+                <header class="lane-head">
+                    <span class="lane-swatch status-@Slug(lane.Label)" aria-hidden="true"></span>
+                    <h2>@lane.Label</h2>
+                    <span class="tag">@lane.Cards.Count</span>
+                </header>
+
+                <div class="lane-cards">
+                    @foreach (var card in lane.Cards)
+                    {
+                        <article class="kcard"
+                                 draggable="@(CanEdit ? "true" : "false")"
+                                 tabindex="0"
+                                 aria-label="@($"{card.Name}, {lane.Label}. Alt plus left or right arrow moves it.")"
+                                 @ondragstart="() => _dragging = card.ItemId"
+                                 @ondragend="() => _dragging = null"
+                                 @onkeydown="e => OnCardKeyAsync(e, lane, card)">
+                            <p class="kcard-name">@card.Name</p>
+                            @if (card.Cells.Count > 0)
+                            {
+                                <p class="kcard-meta">@string.Join(" · ", card.Cells.Values.Where(value => !string.IsNullOrWhiteSpace(value)))</p>
+                            }
+                        </article>
+                    }
+
+                    @if (lane.Cards.Count == 0)
+                    {
+                        <p class="lane-empty">Drop an item here</p>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public BoardModel Board { get; set; } = default!;
+
+    [Parameter]
+    public Guid StatusColumnId { get; set; }
+
+    [Parameter]
+    public bool HideEmptyLanes { get; set; } = true;
+
+    [Parameter]
+    public bool CanEdit { get; set; }
+
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    private Guid? _dragging;
+    private string? _hover;
+    private string? _error;
+
+    private IReadOnlyList<KanbanLane> Lanes =>
+        Board is null || StatusColumnId == Guid.Empty
+            ? []
+            : KanbanProjection.Build(Board, StatusColumnId, null, HideEmptyLanes);
+
+    private async Task DropAsync(KanbanLane lane)
+    {
+        _hover = null;
+
+        if (!CanEdit || _dragging is not { } itemId)
+        {
+            return;
+        }
+
+        _dragging = null;
+
+        // The unset lane is not a status: dropping there clears the cell.
+        var value = lane.IsEmptyLane ? string.Empty : lane.Label;
+        await WriteAsync(itemId, value);
+    }
+
+    private async Task OnCardKeyAsync(KeyboardEventArgs args, KanbanLane lane, ViewCard card)
+    {
+        if (!CanEdit || !args.AltKey)
+        {
+            return;
+        }
+
+        var lanes = Lanes.Where(candidate => !candidate.IsEmptyLane).ToList();
+        var index = lanes.FindIndex(candidate => candidate.Label == lane.Label);
+
+        var target = args.Key switch
+        {
+            "ArrowRight" when index >= 0 && index < lanes.Count - 1 => lanes[index + 1],
+            "ArrowLeft" when index > 0 => lanes[index - 1],
+            _ => null
+        };
+
+        if (target is null)
+        {
+            return;
+        }
+
+        await WriteAsync(card.ItemId, target.Label);
+    }
+
+    private async Task WriteAsync(Guid itemId, string value)
+    {
+        _error = null;
+
+        var result = await Writer.SetAsync(itemId, StatusColumnId, value);
+        if (!result.Succeeded)
+        {
+            _error = result.Error;
+            return;
+        }
+
+        await OnChanged.InvokeAsync();
+    }
+
+    private static string Slug(string label) =>
+        label.ToLowerInvariant().Replace(' ', '-');
+}

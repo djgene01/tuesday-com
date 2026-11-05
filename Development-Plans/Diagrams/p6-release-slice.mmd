@@ -1,0 +1,7 @@
+flowchart LR
+    D["Dashboard widgets<br/>chart, count, list"] --> PERM["Viewer permission<br/>filter"]
+    PERM --> REL["Release bundle<br/>image + SBOM"]
+    REL --> INS["Operator install<br/>Compose or IIS"]
+    INS --> BK["Backup and restore<br/>drill"]
+    BK --> RB["Rollback rehearsal<br/>N+1 back to N"]
+    RB --> ACC["1.0 acceptance<br/>checklist signed"]

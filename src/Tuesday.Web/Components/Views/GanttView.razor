@@ -1,0 +1,284 @@
+@using Tuesday.Application.Tenancy
+@using Tuesday.Application.Boards
+@using Tuesday.Application.Views
+@using Tuesday.Infrastructure.Views
+@implements IAsyncDisposable
+@inject DependencyService Dependencies
+@inject ITenantContext Tenant
+
+@if (Model.Timeline.Bars.Count == 0)
+{
+    <p class="meta">No item on this board has a start date, so there is nothing to draw.</p>
+}
+else
+{
+    @if (_error is not null)
+    {
+        <p class="alert alert-bad" role="alert">@_error</p>
+    }
+    @if (_notice is not null)
+    {
+        <p class="alert alert-good" role="status">@_notice</p>
+    }
+
+    <div class="gantt" role="table" aria-label="Board gantt">
+        <svg class="gantt-links" viewBox="0 0 100 @(Rows.Count * Row)" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+                <marker id="gantt-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                    <path d="M0,0 L6,3 L0,6 z" fill="currentColor" />
+                </marker>
+            </defs>
+            @foreach (var link in VisibleLinks)
+            {
+                <path d="@PathFor(link)"
+                      class="gantt-link"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linejoin="round"
+                      marker-end="url(#gantt-arrow)"
+                      vector-effect="non-scaling-stroke" />
+            }
+        </svg>
+
+        <div class="gantt-heads" aria-hidden="true">
+            @foreach (var link in VisibleLinks)
+            {
+                <span class="gantt-head" style="@HeadStyle(link)"></span>
+            }
+        </div>
+
+        @foreach (var row in Rows)
+        {
+            <div class="gantt-row" role="row">
+                <span class="gantt-label" role="cell">@row.Bar.Name</span>
+                <div class="tl-track" role="cell">
+                    <div class="tl-bar tl-bar-gantt"
+                         style="@Style(row.Bar)"
+                         title="@($"{row.Bar.Start:d MMM} – {row.Bar.End:d MMM}")">
+                        <span class="tl-bar-text">@row.Bar.DayCount d</span>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <section class="gantt-links-panel">
+        <h2>Dependencies</h2>
+        <p class="meta">@VisibleLinks.Count arrows drawn from @Model.Links.Count stored links.</p>
+
+        @if (CanEdit)
+        {
+            <div class="gantt-form">
+                <label class="field">
+                    <span>This item</span>
+                    <select @bind="_successorId">
+                        <option value="@Guid.Empty">Choose an item</option>
+                        @foreach (var choice in Choices)
+                        {
+                            <option value="@choice.Id">@choice.Name</option>
+                        }
+                    </select>
+                </label>
+
+                <label class="field">
+                    <span>depends on</span>
+                    <select @bind="_predecessorId">
+                        <option value="@Guid.Empty">Choose an item</option>
+                        @foreach (var choice in Choices)
+                        {
+                            <option value="@choice.Id">@choice.Name</option>
+                        }
+                    </select>
+                </label>
+
+                <button type="button" class="btn" @onclick="AddAsync">Add dependency</button>
+            </div>
+            <p class="meta">A link that would close a loop is refused.</p>
+        }
+
+        @if (Model.Links.Count > 0)
+        {
+            <ul class="gantt-link-list">
+                @foreach (var link in Model.Links)
+                {
+                    <li>
+                        <span>@NameOf(link.ToItemId) waits on @NameOf(link.FromItemId)</span>
+                        @if (CanEdit)
+                        {
+                            <button type="button" class="btn-quiet"
+                                    @onclick="() => RemoveAsync(link)"
+                                    aria-label="@($"Remove dependency {NameOf(link.ToItemId)} on {NameOf(link.FromItemId)}")">
+                                Remove
+                            </button>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+}
+
+@code {
+    private const int MaxRows = 40;
+    private const int Row = 34;
+
+    [Parameter, EditorRequired]
+    public BoardModel Board { get; set; } = default!;
+
+    [Parameter]
+    public Guid BoardId { get; set; }
+
+    [Parameter]
+    public Guid StartColumnId { get; set; }
+
+    [Parameter]
+    public Guid EndColumnId { get; set; }
+
+    [Parameter]
+    public bool CanEdit { get; set; }
+
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    private IReadOnlyList<Tuesday.Domain.Boards.ItemDependency> _dependencies = [];
+    private string? _error;
+    private string? _notice;
+    private Guid _predecessorId;
+    private Guid _successorId;
+
+    private TimelineModel Timeline =>
+        Board is null || StartColumnId == Guid.Empty
+            ? new TimelineModel(DateOnly.FromDateTime(DateTime.UtcNow), DateOnly.FromDateTime(DateTime.UtcNow), [], [], [])
+            : TimelineProjection.Build(Board, StartColumnId, EndColumnId == Guid.Empty ? StartColumnId : EndColumnId);
+
+    private GanttModel Model => GanttProjection.Build(Timeline, _dependencies);
+
+    private sealed record GanttRow(int Index, TimelineBar Bar);
+
+    private IReadOnlyList<GanttRow> Rows =>
+        Model.Timeline.Bars.Take(MaxRows).Select((bar, index) => new GanttRow(index, bar)).ToList();
+
+    private IReadOnlyList<ItemChoice> Choices => Board.Items
+        .Take(120)
+        .Select(item => new ItemChoice(item.Id, item.Name))
+        .ToList();
+
+    private sealed record ItemChoice(Guid Id, string Name);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLinksAsync();
+    }
+
+    private async Task LoadLinksAsync()
+    {
+        _dependencies = await Dependencies.ListAsync(BoardId);
+    }
+
+    private string PathFor(GanttLink link)
+    {
+        var rows = Rows;
+        var from = rows.FirstOrDefault(row => row.Bar.ItemId == link.FromItemId);
+        var to = rows.FirstOrDefault(row => row.Bar.ItemId == link.ToItemId);
+
+        // An arrow to a row that is not drawn cannot be drawn either.
+        if (from is null || to is null)
+        {
+            return string.Empty;
+        }
+
+        var x1 = from.Bar.LeftPercent + Math.Max(from.Bar.WidthPercent, 1.2);
+        var x2 = to.Bar.LeftPercent;
+        var y1 = (from.Index * Row) + (Row / 2.0);
+        var y2 = (to.Index * Row) + (Row / 2.0);
+
+        // Elbow so two arrows between the same pair do not overlap completely.
+        var mid = Math.Min(99.5, x1 + Math.Max(0.6, (x2 - x1) / 2));
+
+        // SVG numbers are locale-independent: a comma decimal separator silently
+        // invalidates the whole path, so every coordinate is formatted invariantly.
+        static string Num(double value) =>
+            value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+
+        return $"M {Num(x1)} {Num(y1)} H {Num(mid)} V {Num(y2)} H {Num(x2)}";
+    }
+
+    private static string Style(TimelineBar bar) => string.Create(
+        System.Globalization.CultureInfo.InvariantCulture,
+        $"left:{bar.LeftPercent:0.####}%;width:{Math.Max(bar.WidthPercent, 1.2):0.####}%");
+
+    private IReadOnlyList<GanttLink> VisibleLinks
+    {
+        get
+        {
+            // Only links whose two ends are both drawn can become an arrow; anything else
+            // would render as an empty path element with no geometry.
+            var drawn = Rows.Select(row => row.Bar.ItemId).ToHashSet();
+            return Model.Links
+                .Where(link => drawn.Contains(link.FromItemId) && drawn.Contains(link.ToItemId))
+                .ToList();
+        }
+    }
+
+    private string NameOf(Guid itemId) =>
+        Board.Items.FirstOrDefault(item => item.Id == itemId)?.Name ?? "unknown item";
+
+    /// <summary>
+    /// The arrowhead is HTML, not an SVG marker: the chart's viewBox scales x by roughly
+    /// 12 and y by 1, so a marker declared in user units is stretched out of existence.
+    /// </summary>
+    private string HeadStyle(GanttLink link)
+    {
+        var rows = Rows;
+        var to = rows.FirstOrDefault(row => row.Bar.ItemId == link.ToItemId);
+        if (to is null)
+        {
+            return "display:none";
+        }
+
+        return string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"left:calc({to.Bar.LeftPercent:0.###}% - 10px);top:{(to.Index * Row) + (Row / 2.0) - 6:0.###}px");
+    }
+
+    private async Task AddAsync()
+    {
+        _error = null;
+        _notice = null;
+
+        if (!CanEdit || Tenant.TenantId is not { } tenantId)
+        {
+            return;
+        }
+
+        if (_predecessorId == Guid.Empty || _successorId == Guid.Empty)
+        {
+            _error = "Choose both items first.";
+            return;
+        }
+
+        var result = await Dependencies.AddAsync(BoardId, _successorId, _predecessorId, tenantId);
+        if (!result.Succeeded)
+        {
+            _error = result.Error;
+            return;
+        }
+
+        _notice = "Dependency added.";
+        await LoadLinksAsync();
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task RemoveAsync(GanttLink link)
+    {
+        _error = null;
+        _notice = null;
+
+        await Dependencies.RemoveAsync(BoardId, link.ToItemId, link.FromItemId);
+        await LoadLinksAsync();
+        await OnChanged.InvokeAsync();
+    }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+}

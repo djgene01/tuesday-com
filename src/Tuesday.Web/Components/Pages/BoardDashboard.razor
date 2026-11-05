@@ -1,0 +1,213 @@
+@page "/board/{BoardId:guid}/dashboard"
+@using Microsoft.AspNetCore.Authorization
+@using Tuesday.Application.Boards
+@using Tuesday.Application.Tenancy
+@using Tuesday.Domain.Automation
+@using Tuesday.Infrastructure.Automations
+@using Tuesday.Infrastructure.Queries
+@using Tuesday.Web.Security
+@attribute [Authorize(Policy = "capability:ViewWorkspace")]
+@inject WorkspaceQueries Boards
+@inject BoardQueries Queries
+@inject AutomationService Automations
+@inject WebhookService Hooks
+@inject ITenantContext Tenant
+@inject IHttpContextAccessor HttpContextAccessor
+
+<PageTitle>@(_board?.Name ?? "Board") dashboard — Tuesday.com</PageTitle>
+
+@if (_board is null)
+{
+    <main class="shell">
+        <p class="eyebrow">404</p>
+        <h1>Board not found</h1>
+        <p><a href="/workspace">Back to your workspace</a></p>
+    </main>
+}
+else
+{
+    <main class="board-shell">
+        <p class="eyebrow"><a href="/board/@BoardId">@_board.Name</a> · dashboard</p>
+        <div class="board-head">
+            <h1>Dashboard</h1>
+            <a class="row-open" href="/board/@BoardId">Back to the board</a>
+        </div>
+
+        <section class="stat-grid" aria-label="Board totals">
+            <div class="stat">
+                <span class="stat-value">@_board.ItemCount</span>
+                <span class="stat-label">Items</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value">@_board.Groups.Count</span>
+                <span class="stat-label">Groups</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value">@_overdue</span>
+                <span class="stat-label">Overdue</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value">@_donePercent%</span>
+                <span class="stat-label">Done</span>
+            </div>
+        </section>
+
+        <section aria-label="By status">
+            <h2 class="section-title">By status</h2>
+            @foreach (var lane in _byStatus)
+            {
+                <div class="bar-row">
+                    <span class="bar-label">@lane.Label</span>
+                    <span class="bar-track"><span class="bar-fill" style="@Width(lane.Count)"></span></span>
+                    <span class="bar-count">@lane.Count</span>
+                </div>
+            }
+        </section>
+
+        <section aria-label="By group">
+            <h2 class="section-title">By group</h2>
+            @foreach (var group in _board.Groups)
+            {
+                <div class="bar-row">
+                    <span class="bar-label">@group.Title</span>
+                    <span class="bar-track"><span class="bar-fill" style="@Width(group.Items.Count)"></span></span>
+                    <span class="bar-count">@group.Items.Count</span>
+                </div>
+            }
+        </section>
+
+        <section aria-label="Automations">
+            <h2 class="section-title">Automations</h2>
+            @if (_automations.Count == 0)
+            {
+                <p class="meta">No automations on this board.</p>
+            }
+            else
+            {
+                <ul class="file-list">
+                    @foreach (var rule in _automations)
+                    {
+                        <li>
+                            <span class="file-name">@rule.Name</span>
+                            <span class="meta">@rule.Trigger · @(string.IsNullOrWhiteSpace(rule.Condition) ? "always" : rule.Condition)</span>
+                            <span class="tag @(rule.Enabled ? "tag-accent" : "tag-quiet")">@(rule.Enabled ? "on" : "off")</span>
+                        </li>
+                    }
+                </ul>
+            }
+
+            <h3 class="section-sub">Recent runs</h3>
+            @if (_runs.Count == 0)
+            {
+                <p class="meta">Nothing has run yet. Edit a status cell to fire a rule.</p>
+            }
+            else
+            {
+                <ul class="file-list">
+                    @foreach (var run in _runs)
+                    {
+                        <li>
+                            <span class="tag @(run.Status == AutomationRunStatus.Succeeded ? "tag-accent" : "tag-quiet")">@run.Status</span>
+                            <span class="file-name">@run.Name</span>
+                            <span class="meta">@run.Message · @run.CreatedAt.ToLocalTime().ToString("d MMM, HH:mm")</span>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+
+        <section aria-label="Webhooks">
+            <h2 class="section-title">Webhooks</h2>
+            @if (_hooks.Count == 0)
+            {
+                <p class="meta">No webhooks registered. Register one through <code>POST /api/v1/boards/{BoardId}/webhooks</code>.</p>
+            }
+            else
+            {
+                <ul class="file-list">
+                    @foreach (var hook in _hooks)
+                    {
+                        <li>
+                            <span class="file-name">@hook.Url</span>
+                            <span class="meta">last status @(hook.LastStatus?.ToString() ?? "never") · @(hook.LastCalledAt?.ToLocalTime().ToString("d MMM, HH:mm") ?? "not called")</span>
+                            <span class="tag @(hook.Enabled ? "tag-accent" : "tag-quiet")">@(hook.Enabled ? "on" : "off")</span>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+    </main>
+}
+
+@code {
+    [Parameter]
+    public Guid BoardId { get; set; }
+
+    private BoardModel? _board;
+    private IReadOnlyList<(string Label, int Count)> _byStatus = [];
+    private IReadOnlyList<AutomationRow> _automations = [];
+    private IReadOnlyList<AutomationRunRow> _runs = [];
+    private IReadOnlyList<WebhookRow> _hooks = [];
+    private int _overdue;
+    private int _donePercent;
+    private int _max = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Tenant.UserId is not { } userId || Tenant.Role is not { } role)
+        {
+            return;
+        }
+
+        if (await Boards.FindBoardAsync(BoardId, userId, role) is null)
+        {
+            HttpContextAccessor.HttpContext?.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        _board = await Queries.GetAsync(BoardId);
+
+        if (_board is null)
+        {
+            return;
+        }
+
+        var statusColumn = _board.Columns.FirstOrDefault(column => column.Title.Equals("Status", StringComparison.OrdinalIgnoreCase))
+                           ?? _board.Columns.FirstOrDefault(column => column.Type == Tuesday.Domain.Boards.ColumnType.Status);
+
+        var dueColumn = _board.Columns.FirstOrDefault(column => column.Type == Tuesday.Domain.Boards.ColumnType.Date);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        _byStatus = statusColumn is null
+            ? []
+            : _board.Items
+                .GroupBy(item => item.Cells.GetValueOrDefault(statusColumn.Id) ?? "No status")
+                .OrderByDescending(group => group.Count())
+                .Select(group => (group.Key, group.Count()))
+                .ToList();
+
+        _max = Math.Max(1, _byStatus.Select(lane => lane.Count).DefaultIfEmpty(1).Concat(_board.Groups.Select(group => group.Items.Count)).Max());
+
+        _overdue = dueColumn is null
+            ? 0
+            : _board.Items.Count(item =>
+                DateOnly.TryParse(item.Cells.GetValueOrDefault(dueColumn.Id), out var due)
+                && due < today
+                && !string.Equals(item.Cells.GetValueOrDefault(statusColumn?.Id ?? Guid.Empty), "Done", StringComparison.OrdinalIgnoreCase));
+
+        var done = statusColumn is null
+            ? 0
+            : _board.Items.Count(item =>
+                string.Equals(item.Cells.GetValueOrDefault(statusColumn.Id), "Done", StringComparison.OrdinalIgnoreCase));
+
+        _donePercent = _board.ItemCount == 0 ? 0 : (int)Math.Round(done * 100.0 / _board.ItemCount);
+
+        _automations = await Automations.ListAsync(BoardId);
+        _runs = await Automations.RecentRunsAsync(BoardId, 8);
+        _hooks = await Hooks.ListAsync(BoardId);
+    }
+
+    private string Width(int count) =>
+        $"width:{(count * 100.0 / _max).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)}%";
+}

@@ -1,0 +1,81 @@
+# Local development dependencies only. The application containers arrive in P6.
+# Credentials here are development defaults and are overridden from the environment.
+#
+# PostgreSQL is the system of record. MySQL is kept only as a switchable fallback while
+# the cutover is being proven; start it with `--profile legacy-mysql` if you need it.
+
+name: tuesday-dev
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: tuesday-postgres
+    restart: unless-stopped
+    command:
+      - -c
+      - timezone=UTC
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=256MB
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tuesday}
+      POSTGRES_USER: ${POSTGRES_USER:-tuesday}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tuesday_dev_password}
+      TZ: UTC
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-tuesday} -d ${POSTGRES_DB:-tuesday}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  mysql:
+    profiles: ["legacy-mysql"]
+    image: mysql:8.4
+    container_name: tuesday-mysql
+    restart: "no"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+      - --max-connections=300
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_dev_password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-tuesday}
+      MYSQL_USER: ${MYSQL_USER:-tuesday}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-tuesday_dev_password}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_dev_password}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: tuesday-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres-data:
+  mysql-data:
+  redis-data:

@@ -1,0 +1,85 @@
+# Release compose: the app plus its two dependencies, on one host.
+# Copy .env.example to .env and set real secrets before the first `docker compose up -d`.
+#
+#   docker compose -f docker/compose.release.yaml --env-file docker/.env up -d --build
+#
+# PostgreSQL is the system of record. The OpenIddict signing certificate must be mounted:
+# without it the container refuses to start in Production rather than issuing tokens that
+# do not survive a restart.
+
+name: tuesday
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: tuesday-web:${TUESDAY_TAG:-local}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-tuesday};Username=${POSTGRES_USER:-tuesday};Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD};Timeout=10"
+      Redis__Configuration: "redis:6379,abortConnect=false"
+      Storage__Root: /var/tuesday/files
+      Email__Enabled: ${EMAIL_ENABLED:-false}
+      Email__Host: ${EMAIL_HOST:-}
+      Email__From: ${EMAIL_FROM:-no-reply@tuesday.local}
+      IdentityServer__ClientSecret: ${IDENTITY_CLIENT_SECRET:?set IDENTITY_CLIENT_SECRET}
+      IdentityServer__SigningCertificatePath: /var/tuesday/keys/idp.pfx
+      IdentityServer__SigningCertificatePassword: ${IDENTITY_SIGNING_PASSWORD:?set IDENTITY_SIGNING_PASSWORD}
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - app-files:/var/tuesday/files
+      - ${IDENTITY_SIGNING_PFX:-./keys/idp.pfx}:/var/tuesday/keys/idp.pfx:ro
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      interval: 30s
+      timeout: 3s
+      retries: 5
+      start_period: 40s
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    command:
+      - -c
+      - timezone=UTC
+      - -c
+      - max_connections=200
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tuesday}
+      POSTGRES_USER: ${POSTGRES_USER:-tuesday}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      TZ: UTC
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-tuesday} -d ${POSTGRES_DB:-tuesday}"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres-data:
+  redis-data:
+  app-files:

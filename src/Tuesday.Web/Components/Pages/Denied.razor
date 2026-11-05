@@ -1,0 +1,12 @@
+@page "/denied"
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+
+<PageTitle>No access — Tuesday.com</PageTitle>
+
+<main class="shell">
+    <p class="eyebrow">403</p>
+    <h1>No access</h1>
+    <p class="lede">Your role does not allow this. Ask a tenant admin if you need it.</p>
+    <p><a href="/workspace">Back to your workspace</a></p>
+</main>

@@ -1,0 +1,178 @@
+@using Tuesday.Application.Boards
+@using Tuesday.Application.Views
+@using Tuesday.Infrastructure.Values
+@inject ColumnValueWriter Writer
+
+<div class="cal-toolbar">
+    <div class="cal-nav">
+        <button type="button" class="btn-quiet" @onclick="() => StepAsync(-1)" aria-label="Previous period">←</button>
+        <h2 class="cal-title">@Title</h2>
+        <button type="button" class="btn-quiet" @onclick="() => StepAsync(1)" aria-label="Next period">→</button>
+    </div>
+
+    <div class="cal-modes" role="group" aria-label="Calendar scale">
+        <button type="button" class="mode @(_week ? null : "is-active")" aria-pressed="@(!_week ? "true" : "false")" @onclick="() => SetModeAsync(false)">Month</button>
+        <button type="button" class="mode @(_week ? "is-active" : null)" aria-pressed="@(_week ? "true" : "false")" @onclick="() => SetModeAsync(true)">Week</button>
+    </div>
+
+    <p class="meta">@Model.PlacedCount placed · @Model.Undated.Count undated</p>
+</div>
+
+@if (_error is not null)
+{
+    <p class="alert alert-bad" role="alert">@_error</p>
+}
+
+<div class="cal-weekdays" aria-hidden="true">
+    @foreach (var day in new[] { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" })
+    {
+        <span>@day</span>
+    }
+</div>
+
+<div class="cal-grid @(_week ? "cal-week" : null)" role="grid" aria-label="@Title">
+    @foreach (var day in Model.Days)
+    {
+        <section class="cal-day @(day.InMonth ? null : "is-outside") @(day.IsToday ? "is-today" : null)"
+                 role="gridcell"
+                 aria-label="@($"{day.Date:ddd d MMM yyyy}, {day.Cards.Count} items")"
+                 @ondragover:preventDefault
+                 @ondrop="() => DropAsync(day)">
+            <header class="cal-day-head">
+                <span class="cal-day-num">@day.Date.Day</span>
+                @if (day.Cards.Count > 0)
+                {
+                    <span class="tag">@day.Cards.Count</span>
+                }
+            </header>
+
+            <div class="cal-cards">
+                @foreach (var card in day.Cards)
+                {
+                    <article class="kcard kcard-small"
+                             draggable="@(CanEdit ? "true" : "false")"
+                             tabindex="0"
+                             aria-label="@($"{card.Name} on {day.Date:dddd d MMMM}. Alt plus left or right arrow reschedules it a day.")"
+                             @ondragstart="() => _dragging = card.ItemId"
+                             @ondragend="() => _dragging = null"
+                             @onkeydown="e => OnCardKeyAsync(e, day, card)">
+                        <p class="kcard-name">@card.Name</p>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+</div>
+
+@if (Model.Undated.Count > 0)
+{
+    <section class="cal-undated">
+        <h2>No date yet</h2>
+        <p class="meta">These items have no value in the date column, so they cannot be placed.</p>
+        <div class="cal-cards">
+            @foreach (var card in Model.Undated)
+            {
+                <article class="kcard kcard-small">
+                    <p class="kcard-name">@card.Name</p>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public BoardModel Board { get; set; } = default!;
+
+    [Parameter]
+    public Guid DateColumnId { get; set; }
+
+    [Parameter]
+    public bool CanEdit { get; set; }
+
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    private DateOnly _anchor = DateOnly.FromDateTime(DateTime.UtcNow);
+    private bool _week;
+    private Guid? _dragging;
+    private string? _error;
+
+    private CalendarModel Model =>
+        Board is null || DateColumnId == Guid.Empty
+            ? new CalendarModel(_anchor, _anchor, [], [])
+            : _week
+                ? CalendarProjection.Week(Board, DateColumnId, _anchor)
+                : CalendarProjection.Month(Board, DateColumnId, _anchor.Year, _anchor.Month);
+
+    private string Title => _week
+        ? $"Week of {CalendarProjection.StartOfWeek(_anchor):d MMM yyyy}"
+        : _anchor.ToString("MMMM yyyy");
+
+    private async Task SetModeAsync(bool week)
+    {
+        _week = week;
+        await Task.CompletedTask;
+    }
+
+    private async Task StepAsync(int direction)
+    {
+        _anchor = _week
+            ? _anchor.AddDays(7 * direction)
+            : _anchor.AddMonths(direction);
+
+        await Task.CompletedTask;
+    }
+
+    private async Task DropAsync(CalendarDay day)
+    {
+        if (!CanEdit || _dragging is not { } itemId)
+        {
+            return;
+        }
+
+        _dragging = null;
+        await WriteAsync(itemId, day.Date);
+    }
+
+    private async Task OnCardKeyAsync(KeyboardEventArgs args, CalendarDay day, ViewCard card)
+    {
+        if (!CanEdit || !args.AltKey)
+        {
+            return;
+        }
+
+        var delta = args.Key switch
+        {
+            "ArrowRight" => 1,
+            "ArrowLeft" => -1,
+            _ => 0
+        };
+
+        if (delta == 0)
+        {
+            return;
+        }
+
+        var current = card.Date(DateColumnId) ?? day.Date;
+        await WriteAsync(card.ItemId, current.AddDays(delta));
+    }
+
+    private async Task WriteAsync(Guid itemId, DateOnly date)
+    {
+        _error = null;
+
+        var result = await Writer.SetAsync(
+            itemId,
+            DateColumnId,
+            date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+
+        if (!result.Succeeded)
+        {
+            _error = result.Error;
+            return;
+        }
+
+        await OnChanged.InvokeAsync();
+    }
+}

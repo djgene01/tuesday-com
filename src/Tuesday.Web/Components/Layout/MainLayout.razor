@@ -1,0 +1,35 @@
+@inherits LayoutComponentBase
+
+<div class="app">
+    <header class="topbar">
+        <a class="brand" href="/">Tuesday<span class="dot">.</span>com</a>
+
+        <nav class="topnav" aria-label="Main">
+            <AuthorizeView>
+                <Authorized>
+                    <a href="/workspace">Workspace</a>
+                    <a href="/search">Search</a>
+                    <a href="/notifications">Notifications</a>
+                    <a href="/account/tokens">API tokens</a>
+                    <a href="/account/security">Security</a>
+                    <span class="who">@context.User.Identity?.Name</span>
+                    <form method="post" action="/logout" class="inline-form">
+                        <AntiforgeryToken />
+                        <button type="submit" class="link-button">Sign out</button>
+                    </form>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="/login">Sign in</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </nav>
+    </header>
+
+    <div class="app-body">
+        @Body
+    </div>
+</div>
+
+<div id="blazor-error-ui" role="alert">
+    Something went wrong. <a href=".">Reload</a>
+</div>
