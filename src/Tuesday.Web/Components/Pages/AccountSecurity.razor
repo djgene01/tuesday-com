@@ -11,68 +11,77 @@
 
 <PageTitle>Account security — Tuesday.com</PageTitle>
 
-<section class="page">
-    <p class="eyebrow">Your account</p>
-    <h1>Account security</h1>
-    <p class="lede">A second factor protects your session, your API tokens and the board data your role can reach.</p>
+<section class="mx-auto max-w-[820px]">
+    <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-soft">Your account</p>
+    <h1 class="mt-1 font-display text-[26px] font-semibold leading-tight tracking-tight text-ink">Account security</h1>
+    <p class="mt-1 text-sm text-ink-soft">A second factor protects your session, your API tokens and the board data your role can reach.</p>
 
     @if (_message is not null)
     {
-        <p class="alert alert-good" role="status">@_message</p>
+        <p class="mt-4 rounded-lg border border-status-done/30 bg-status-done/10 px-4 py-2 text-sm text-[#007a4d]" role="status">@_message</p>
     }
 
     @if (_error is not null)
     {
-        <p class="alert alert-bad" role="alert">@_error</p>
+        <p class="mt-4 rounded-lg border border-status-stuck/30 bg-status-stuck/10 px-4 py-2 text-sm text-status-stuck" role="alert">@_error</p>
     }
 
     @if (_userId is null)
     {
-        <p class="meta">Loading…</p>
+        <p class="mt-4 text-sm text-ink-faint">Loading…</p>
     }
     else if (_enabled)
     {
-        <div class="panel">
-            <h2>Authenticator app</h2>
-            <p class="meta">Two-factor authentication is <strong>on</strong>. You will be asked for a six-digit code when you sign in.</p>
+        <div class="ui-card mt-4 p-5">
+            <div class="flex items-center gap-2">
+                <h2 class="font-display text-[15px] font-semibold text-ink">Authenticator app</h2>
+                <span class="ui-pill bg-status-done/15 text-[#007a4d]">On</span>
+            </div>
+            <p class="mt-1 text-sm text-ink-soft">You will be asked for a six-digit code when you sign in.</p>
 
             @if (_recoveryCodes is not null)
             {
-                <h3>Recovery codes</h3>
-                <p class="meta">Store these somewhere safe. Each one works once, and they replace any earlier set.</p>
-                <ul class="code-list">
+                <h3 class="mt-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Recovery codes</h3>
+                <p class="mt-1 text-[12px] text-ink-faint">Store these somewhere safe. Each one works once, and they replace any earlier set.</p>
+                <ul class="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-5">
                     @foreach (var recoveryCode in _recoveryCodes)
                     {
-                        <li><code>@recoveryCode</code></li>
+                        <li class="rounded-control bg-canvas px-2 py-1 text-center"><code class="text-[12px] text-ink">@recoveryCode</code></li>
                     }
                 </ul>
             }
 
-            <button type="button" class="btn" @onclick="RegenerateCodesAsync" disabled="@_busy">Generate new recovery codes</button>
-            <button type="button" class="btn-quiet" @onclick="DisableAsync" disabled="@_busy">Turn off two-factor</button>
+            <div class="mt-4 flex flex-wrap gap-2">
+                <button type="button" class="ui-btn-ghost !h-9 px-4 text-[13px]" @onclick="RegenerateCodesAsync" disabled="@_busy">Generate new recovery codes</button>
+                <button type="button" class="ui-btn-quiet !h-9 px-4 text-[13px] hover:text-status-stuck" @onclick="DisableAsync" disabled="@_busy">Turn off two-factor</button>
+            </div>
         </div>
     }
     else
     {
-        <div class="panel">
-            <h2>Authenticator app</h2>
-            <p class="meta">Two-factor authentication is <strong>off</strong>. Enrol an authenticator app (1Password, Google Authenticator, Authy) to turn it on.</p>
-            <button type="button" class="btn-primary" @onclick="BeginEnrolmentAsync" disabled="@_busy">Set up authenticator</button>
+        <div class="ui-card mt-4 p-5">
+            <div class="flex items-center gap-2">
+                <h2 class="font-display text-[15px] font-semibold text-ink">Authenticator app</h2>
+                <span class="ui-pill bg-canvas text-ink-soft">Off</span>
+            </div>
+            <p class="mt-1 text-sm text-ink-soft">Enrol an authenticator app (1Password, Google Authenticator, Authy) to turn it on.</p>
+            <button type="button" class="ui-btn-primary mt-4 !h-9 px-4 text-[13px]" @onclick="BeginEnrolmentAsync" disabled="@_busy">Set up authenticator</button>
 
             @if (_sharedKey is not null)
             {
-                <div class="enrol">
-                    <p class="meta">Add this key to your app, then enter the current six-digit code.</p>
-                    <p class="enrol-key"><code>@FormatKey(_sharedKey)</code></p>
-                    <p class="meta">Or open this link on the device: <code class="uri">@_authenticatorUri</code></p>
+                <div class="mt-5 rounded-lg border border-line bg-canvas p-4">
+                    <p class="text-[12px] text-ink-soft">Add this key to your app, then enter the current six-digit code.</p>
+                    <p class="mt-2 rounded-control bg-surface px-3 py-2"><code class="text-[13px] tracking-[0.12em] text-ink">@FormatKey(_sharedKey)</code></p>
+                    <p class="mt-2 break-all text-[11px] text-ink-faint">Or open this link on the device: <code class="text-ink-soft">@_authenticatorUri</code></p>
 
-                    <label class="field">
-                        <span>Verification code</span>
+                    <label class="mt-3 block">
+                        <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Verification code</span>
                         <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code"
-                               @bind="_code" @bind:event="oninput" maxlength="7" />
+                               @bind="_code" @bind:event="oninput" maxlength="7"
+                               class="h-11 w-full rounded-control border border-line-strong bg-surface px-3 text-center text-lg tracking-[0.3em] text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
                     </label>
 
-                    <button type="button" class="btn-primary" @onclick="ConfirmEnrolmentAsync" disabled="@_busy">Verify and turn on</button>
+                    <button type="button" class="ui-btn-primary mt-3 !h-9 px-4 text-[13px]" @onclick="ConfirmEnrolmentAsync" disabled="@_busy">Verify and turn on</button>
                 </div>
             }
         </div>

@@ -10,24 +10,26 @@
 @inject ITenantContext Tenant
 @inject TenantContextBootstrapper Bootstrapper
 
-<section class="thread" aria-label="Updates">
-    <header class="thread-head">
-        <h2>Updates</h2>
-        <p class="meta">@CountLabel</p>
+<section class="ui-card mt-4 overflow-hidden" aria-label="Updates">
+    <header class="flex items-center gap-3 border-b border-line px-4 py-3">
+        <h2 class="font-display text-[15px] font-semibold text-ink">Updates</h2>
+        <p class="text-xs text-ink-faint">@CountLabel</p>
     </header>
 
     @if (CanEdit)
     {
-        <div class="composer">
-            <label class="field">
-                <span>Write an update</span>
+        <div class="border-b border-line px-4 py-3">
+            <label class="block">
+                <span class="sr-only">Write an update</span>
                 <textarea @bind="_draft" @bind:event="oninput" rows="3"
-                          placeholder="Plain text, or simple HTML like <strong>bold</strong>"
-                          aria-label="Write an update"></textarea>
+                          placeholder="Write an update — plain text, or simple HTML like <strong>bold</strong>"
+                          aria-label="Write an update"
+                          class="w-full resize-y rounded-control border border-line-strong bg-surface px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink-faint focus:border-brand focus:ring-2 focus:ring-brand/20"></textarea>
             </label>
-            <div class="composer-actions">
-                <p class="meta">Formatting is limited to bold, italic, lists, quotes, code and links.</p>
-                <button type="button" class="btn" disabled="@(string.IsNullOrWhiteSpace(_draft) || _busy)"
+            <div class="mt-2 flex items-center gap-3">
+                <p class="text-[11px] text-ink-faint">Formatting is limited to bold, italic, lists, quotes, code and links.</p>
+                <button type="button" class="ui-btn-primary ml-auto !h-8 !px-3 text-[13px] disabled:opacity-50"
+                        disabled="@(string.IsNullOrWhiteSpace(_draft) || _busy)"
                         @onclick="PostAsync">
                     @(_busy ? "Posting…" : "Post update")
                 </button>
@@ -37,125 +39,137 @@
 
     @if (_error is not null)
     {
-        <p class="alert alert-bad" role="alert">@_error</p>
+        <p class="border-b border-line bg-status-stuck/10 px-4 py-2 text-sm text-status-stuck" role="alert">@_error</p>
     }
 
     @if (_nodes is null)
     {
-        <p class="meta">Loading…</p>
+        <p class="px-4 py-4 text-sm text-ink-faint">Loading…</p>
     }
     else if (_nodes.Count == 0)
     {
-        <p class="meta">No updates yet. The first one starts the conversation.</p>
+        <p class="px-4 py-8 text-center text-sm text-ink-soft">No updates yet. The first one starts the conversation.</p>
     }
     else
     {
+        <ul class="divide-y divide-line">
         @foreach (var node in _nodes)
         {
-            <article class="update" aria-label="@($"Update from {node.AuthorName}")">
-                <header class="update-head">
-                    <span class="avatar" aria-hidden="true">@Initials(node.AuthorName)</span>
-                    <span class="update-author">@node.AuthorName</span>
-                    <time datetime="@node.CreatedAt.ToString("O")">@Stamp(node.CreatedAt)</time>
-                    @if (node.EditedAt is not null)
-                    {
-                        <span class="tag tag-quiet">edited</span>
-                    }
-                </header>
-
-                @if (node.IsDeleted)
-                {
-                    <p class="update-body update-deleted">This update was deleted.</p>
-                }
-                else
-                {
-                    <div class="update-body">@((MarkupString)node.Html)</div>
-                }
-
-                <footer class="update-foot">
-                    <button type="button" class="btn-like @(node.LikedByMe ? "is-liked" : null)"
-                            aria-pressed="@(node.LikedByMe ? "true" : "false")"
-                            disabled="@(!CanEdit)"
-                            @onclick="() => ToggleLikeAsync(node.Id)">
-                        ♥ @node.LikeCount
-                    </button>
-
-                    @if (CanEdit && !node.IsDeleted)
-                    {
-                        <button type="button" class="btn-quiet" @onclick="() => ToggleReply(node.Id)">
-                            @(_replyTo == node.Id ? "Cancel" : "Reply")
-                        </button>
-                    }
-
-                    @if (CanEdit && !node.IsDeleted && node.AuthorId == Tenant.UserId)
-                    {
-                        <button type="button" class="btn-quiet" @onclick="() => StartEdit(node)">
-                            @(_editingId == node.Id ? "Cancel edit" : "Edit")
-                        </button>
-                    }
-
-                    @if (CanEdit && !node.IsDeleted && (node.AuthorId == Tenant.UserId || Tenant.Role == Tuesday.Domain.Tenancy.TenantRole.Admin))
-                    {
-                        <button type="button" class="btn-quiet" @onclick="() => DeleteAsync(node.Id)" disabled="@_busy">
-                            Delete
-                        </button>
-                    }
-
-                    <button type="button" class="btn-quiet" @onclick="() => ToggleReplies(node.Id)">
-                        @(IsOpen(node.Id) ? "Hide replies" : $"Replies ({node.Replies.Count})")
-                    </button>
-                </footer>
-
-                @if (_editingId == node.Id)
-                {
-                    <div class="reply-box">
-                        <textarea @bind="_editDraft" @bind:event="oninput" rows="3"
-                                  aria-label="Edit update"></textarea>
-                        <button type="button" class="btn" disabled="@(string.IsNullOrWhiteSpace(_editDraft) || _busy)"
-                                @onclick="() => SaveEditAsync(node.Id)">
-                            Save
-                        </button>
-                    </div>
-                }
-
-                @if (_replyTo == node.Id)
-                {
-                    <div class="reply-box">
-                        <textarea @bind="_replyDraft" @bind:event="oninput" rows="2"
-                                  aria-label="@($"Reply to {node.AuthorName}")"></textarea>
-                        <button type="button" class="btn" disabled="@(string.IsNullOrWhiteSpace(_replyDraft) || _busy)"
-                                @onclick="() => ReplyAsync(node.Id)">
-                            Post reply
-                        </button>
-                    </div>
-                }
-
-                @if (IsOpen(node.Id) && node.Replies.Count > 0)
-                {
-                    <div class="replies">
-                        @foreach (var reply in node.Replies)
+            <li class="px-4 py-3">
+                <article aria-label="@($"Update from {node.AuthorName}")">
+                    <header class="mb-1.5 flex items-center gap-2">
+                        <span class="grid h-7 w-7 place-items-center rounded-full bg-brand-tint text-[11px] font-semibold text-brand-ink" aria-hidden="true">@Initials(node.AuthorName)</span>
+                        <span class="text-[13px] font-semibold text-ink">@node.AuthorName</span>
+                        <time class="text-[11px] text-ink-faint" datetime="@node.CreatedAt.ToString("O")">@Stamp(node.CreatedAt)</time>
+                        @if (node.EditedAt is not null)
                         {
-                            <article class="update update-reply" aria-label="@($"Reply from {reply.AuthorName}")">
-                                <header class="update-head">
-                                    <span class="avatar" aria-hidden="true">@Initials(reply.AuthorName)</span>
-                                    <span class="update-author">@reply.AuthorName</span>
-                                    <time datetime="@reply.CreatedAt.ToString("O")">@Stamp(reply.CreatedAt)</time>
-                                </header>
-                                <div class="update-body">@((MarkupString)reply.Html)</div>
-                                <footer class="update-foot">
-                                    <button type="button" class="btn-like @(reply.LikedByMe ? "is-liked" : null)"
-                                            aria-pressed="@(reply.LikedByMe ? "true" : "false")"
-                                            disabled="@(!CanEdit)"
-                                            @onclick="() => ToggleLikeAsync(reply.Id)">
-                                        ♥ @reply.LikeCount
-                                    </button>
-                                </footer>
-                            </article>
+                            <span class="ui-pill bg-canvas text-[10px] text-ink-faint">edited</span>
                         }
-                    </div>
-                }
-            </article>
+                    </header>
+
+                    @if (node.IsDeleted)
+                    {
+                        <p class="pl-9 text-sm italic text-ink-faint">This update was deleted.</p>
+                    }
+                    else
+                    {
+                        <div class="prose-update pl-9 text-sm text-ink">@((MarkupString)node.Html)</div>
+                    }
+
+                    <footer class="mt-1.5 flex flex-wrap items-center gap-1 pl-9">
+                        <button type="button"
+                                class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition @(node.LikedByMe ? "border-status-stuck/30 bg-status-stuck/10 text-status-stuck" : "border-line text-ink-soft hover:bg-canvas")"
+                                aria-pressed="@(node.LikedByMe ? "true" : "false")"
+                                disabled="@(!CanEdit)"
+                                @onclick="() => ToggleLikeAsync(node.Id)">
+                            ♥ @node.LikeCount
+                        </button>
+
+                        @if (CanEdit && !node.IsDeleted)
+                        {
+                            <button type="button" class="ui-btn-quiet !px-2 !py-0.5 text-[11px]" @onclick="() => ToggleReply(node.Id)">
+                                @(_replyTo == node.Id ? "Cancel" : "Reply")
+                            </button>
+                        }
+
+                        @if (CanEdit && !node.IsDeleted && node.AuthorId == Tenant.UserId)
+                        {
+                            <button type="button" class="ui-btn-quiet !px-2 !py-0.5 text-[11px]" @onclick="() => StartEdit(node)">
+                                @(_editingId == node.Id ? "Cancel edit" : "Edit")
+                            </button>
+                        }
+
+                        @if (CanEdit && !node.IsDeleted && (node.AuthorId == Tenant.UserId || Tenant.Role == Tuesday.Domain.Tenancy.TenantRole.Admin))
+                        {
+                            <button type="button" class="ui-btn-quiet !px-2 !py-0.5 text-[11px] hover:text-status-stuck" @onclick="() => DeleteAsync(node.Id)" disabled="@_busy">
+                                Delete
+                            </button>
+                        }
+
+                        <button type="button" class="ui-btn-quiet !px-2 !py-0.5 text-[11px]" @onclick="() => ToggleReplies(node.Id)">
+                            @(IsOpen(node.Id) ? "Hide replies" : $"Replies ({node.Replies.Count})")
+                        </button>
+                    </footer>
+
+                    @if (_editingId == node.Id)
+                    {
+                        <div class="mt-2 space-y-2 pl-9">
+                            <textarea @bind="_editDraft" @bind:event="oninput" rows="3"
+                                      aria-label="Edit update"
+                                      class="w-full resize-y rounded-control border border-line-strong px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"></textarea>
+                            <button type="button" class="ui-btn-primary !h-8 !px-3 text-[13px] disabled:opacity-50"
+                                    disabled="@(string.IsNullOrWhiteSpace(_editDraft) || _busy)"
+                                    @onclick="() => SaveEditAsync(node.Id)">
+                                Save
+                            </button>
+                        </div>
+                    }
+
+                    @if (_replyTo == node.Id)
+                    {
+                        <div class="mt-2 space-y-2 pl-9">
+                            <textarea @bind="_replyDraft" @bind:event="oninput" rows="2"
+                                      aria-label="@($"Reply to {node.AuthorName}")"
+                                      class="w-full resize-y rounded-control border border-line-strong px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"></textarea>
+                            <button type="button" class="ui-btn-primary !h-8 !px-3 text-[13px] disabled:opacity-50"
+                                    disabled="@(string.IsNullOrWhiteSpace(_replyDraft) || _busy)"
+                                    @onclick="() => ReplyAsync(node.Id)">
+                                Post reply
+                            </button>
+                        </div>
+                    }
+
+                    @if (IsOpen(node.Id) && node.Replies.Count > 0)
+                    {
+                        <ul class="mt-2 space-y-3 border-l-2 border-line pl-4 ml-9">
+                            @foreach (var reply in node.Replies)
+                            {
+                                <li>
+                                    <article aria-label="@($"Reply from {reply.AuthorName}")">
+                                        <header class="mb-1 flex items-center gap-2">
+                                            <span class="grid h-6 w-6 place-items-center rounded-full bg-canvas text-[10px] font-semibold text-ink-soft" aria-hidden="true">@Initials(reply.AuthorName)</span>
+                                            <span class="text-[12px] font-semibold text-ink">@reply.AuthorName</span>
+                                            <time class="text-[11px] text-ink-faint" datetime="@reply.CreatedAt.ToString("O")">@Stamp(reply.CreatedAt)</time>
+                                        </header>
+                                        <div class="prose-update text-sm text-ink">@((MarkupString)reply.Html)</div>
+                                        <footer class="mt-1 flex items-center gap-1">
+                                            <button type="button"
+                                                    class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition @(reply.LikedByMe ? "border-status-stuck/30 bg-status-stuck/10 text-status-stuck" : "border-line text-ink-soft hover:bg-canvas")"
+                                                    aria-pressed="@(reply.LikedByMe ? "true" : "false")"
+                                                    disabled="@(!CanEdit)"
+                                                    @onclick="() => ToggleLikeAsync(reply.Id)">
+                                                ♥ @reply.LikeCount
+                                            </button>
+                                        </footer>
+                                    </article>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </article>
+            </li>
         }
+        </ul>
     }
 </section>
 

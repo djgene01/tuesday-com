@@ -38,8 +38,8 @@ public sealed class WalkingSkeletonTests : IClassFixture<TuesdayWebFactory>
         var html = await client.GetStringAsync("/");
 
         Assert.Contains("Tuesday", html, StringComparison.Ordinal);
-        Assert.Contains("Dependencies", html, StringComparison.Ordinal);
-        Assert.Contains("phase P0", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Work operating system", html, StringComparison.Ordinal);
+        Assert.Contains("Live status", html, StringComparison.Ordinal);
     }
 
     [Fact]

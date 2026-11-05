@@ -23,7 +23,7 @@
                 aria-selected="@(current ? "true" : "false")"
                 @onclick="() => SelectAsync(view.Id)">
             <span>@view.Name</span>
-            <span class="rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-medium text-ink-faint group-hover:text-ink-soft">@Kind(view.Type)</span>
+            <span class="rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-medium leading-none text-ink-faint group-hover:text-ink-soft">@Kind(view.Type)</span>
         </button>
     }
     <p class="ml-auto pb-2 text-[11px] text-ink-faint">@_views.Count of @BoardView.MaxViewsPerBoard views</p>

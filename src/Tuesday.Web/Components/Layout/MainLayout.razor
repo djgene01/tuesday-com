@@ -58,16 +58,15 @@
                 </div>
             </Authorized>
             <NotAuthorized>
-                <div class="mt-auto">
-                    <a href="/login" class="ui-btn-primary !px-3 !py-1.5 text-xs">Sign in</a>
-                </div>
+                @* No CTA in the rail: it reads as a floating widget over the page. The top
+                   bar carries the sign-in link instead. *@
             </NotAuthorized>
         </AuthorizeView>
     </aside>
 
     <div class="pl-14">
         <header class="sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-line bg-surface px-5">
-            <a class="font-display text-[15px] font-semibold tracking-tight text-ink" href="/">
+            <a class="font-display text-[15px] font-semibold tracking-tight text-ink no-underline hover:no-underline" href="/">
                 Tuesday<span class="text-brand">.</span>com
             </a>
             <span class="h-4 w-px bg-line" aria-hidden="true"></span>
@@ -77,6 +76,7 @@
                 </Authorized>
                 <NotAuthorized>
                     <span class="text-xs text-ink-soft">Work operating system</span>
+                    <a class="ui-btn-primary ml-auto !h-8 px-3.5 text-[12px]" href="/login">Sign in</a>
                 </NotAuthorized>
             </AuthorizeView>
         </header>

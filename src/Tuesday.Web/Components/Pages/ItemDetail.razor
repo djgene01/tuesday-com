@@ -14,34 +14,38 @@
 
 @if (_board is null || _item is null)
 {
-    <main class="shell">
-        <p class="eyebrow">404</p>
-        <h1>Item not found</h1>
-        <p class="lede">Either it does not exist, or it is not shared with you.</p>
-        <p><a href="/workspace">Back to your workspace</a></p>
+    <main class="mx-auto max-w-[900px]">
+        <div class="ui-card px-6 py-14 text-center">
+            <p class="font-display text-lg font-semibold text-ink">Item not found</p>
+            <p class="mt-1 text-sm text-ink-soft">Either it does not exist, or it is not shared with you.</p>
+            <a class="ui-btn-primary mt-5" href="/workspace">Back to your workspace</a>
+        </div>
     </main>
 }
 else
 {
-    <main class="board-shell">
-        <p class="eyebrow">
-            <a href="/board/@BoardId">@_board.Name</a> · @_group?.Title
-        </p>
+    <main class="mx-auto max-w-[900px]">
+        <nav class="mb-1 flex items-center gap-1.5 text-xs text-ink-soft" aria-label="Breadcrumb">
+            <a class="hover:text-brand" href="/board/@BoardId">@_board.Name</a>
+            <span aria-hidden="true">/</span>
+            <span class="text-ink-faint">@_group?.Title</span>
+        </nav>
 
-        <div class="board-head">
-            <h1>@_item.Name</h1>
+        <div class="mb-4 flex flex-wrap items-center gap-3">
+            <h1 class="font-display text-[26px] font-semibold leading-tight tracking-tight text-ink">@_item.Name</h1>
             @if (!(_card?.CanEdit ?? false))
             {
-                <span class="tag tag-quiet">Read-only</span>
+                <span class="ui-pill border border-line bg-canvas text-ink-soft">Read-only</span>
             }
+            <a class="ui-btn-ghost ml-auto !h-9 !px-4 text-[13px]" href="/board/@BoardId">Back to board</a>
         </div>
 
-        <section class="item-fields" aria-label="Item values">
+        <section class="ui-card mb-4 divide-y divide-line" aria-label="Item values">
             @foreach (var column in _board.Columns)
             {
-                <div class="item-field">
-                    <span class="item-field-label">@column.Title</span>
-                    <span class="item-field-value">@ValueOf(column.Id)</span>
+                <div class="flex items-baseline gap-4 px-4 py-2.5">
+                    <span class="w-[180px] shrink-0 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">@column.Title</span>
+                    <span class="text-sm text-ink">@ValueOf(column.Id)</span>
                 </div>
             }
         </section>
@@ -75,7 +79,7 @@ else
 
         if (_card is null)
         {
-            HttpContextAccessor.HttpContext?.Response.StatusCode = StatusCodes.Status404NotFound;
+            MarkNotFound();
             return;
         }
 
@@ -84,9 +88,22 @@ else
         _group = _board?.Groups.FirstOrDefault(group => group.Items.Any(candidate => candidate.Id == ItemId));
         _item = _group?.Items.FirstOrDefault(candidate => candidate.Id == ItemId);
 
-        if (_item is null && HttpContextAccessor.HttpContext is { } context)
+        if (_item is null)
         {
-            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            MarkNotFound();
+        }
+    }
+
+    /// <summary>404 without leaking existence. Applied on OnStarting so the body survives.</summary>
+    private void MarkNotFound()
+    {
+        if (HttpContextAccessor.HttpContext is { } context)
+        {
+            context.Response.OnStarting(() =>
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return Task.CompletedTask;
+            });
         }
     }
 

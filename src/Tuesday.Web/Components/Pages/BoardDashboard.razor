@@ -18,124 +18,140 @@
 
 @if (_board is null)
 {
-    <main class="shell">
-        <p class="eyebrow">404</p>
-        <h1>Board not found</h1>
-        <p><a href="/workspace">Back to your workspace</a></p>
+    <main class="mx-auto max-w-[900px]">
+        <div class="ui-card px-6 py-14 text-center">
+            <p class="font-display text-lg font-semibold text-ink">Board not found</p>
+            <a class="ui-btn-primary mt-5" href="/workspace">Back to your workspace</a>
+        </div>
     </main>
 }
 else
 {
-    <main class="board-shell">
-        <p class="eyebrow"><a href="/board/@BoardId">@_board.Name</a> · dashboard</p>
-        <div class="board-head">
-            <h1>Dashboard</h1>
-            <a class="row-open" href="/board/@BoardId">Back to the board</a>
+    <main class="mx-auto max-w-[1200px]">
+        <nav class="mb-1 flex items-center gap-1.5 text-xs text-ink-soft" aria-label="Breadcrumb">
+            <a class="hover:text-brand" href="/board/@BoardId">@_board.Name</a>
+            <span aria-hidden="true">/</span>
+            <span class="text-ink-faint">Dashboard</span>
+        </nav>
+
+        <div class="mb-5 flex flex-wrap items-center gap-3">
+            <h1 class="font-display text-[26px] font-semibold leading-tight tracking-tight text-ink">Dashboard</h1>
+            <a class="ui-btn-ghost ml-auto !h-9 !px-4 text-[13px]" href="/board/@BoardId">Back to the board</a>
         </div>
 
-        <section class="stat-grid" aria-label="Board totals">
-            <div class="stat">
-                <span class="stat-value">@_board.ItemCount</span>
-                <span class="stat-label">Items</span>
+        <section class="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Board totals">
+            <div class="ui-card px-4 py-3">
+                <span class="block font-display text-[24px] font-semibold tabular-nums text-ink">@_board.ItemCount</span>
+                <span class="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Items</span>
             </div>
-            <div class="stat">
-                <span class="stat-value">@_board.Groups.Count</span>
-                <span class="stat-label">Groups</span>
+            <div class="ui-card px-4 py-3">
+                <span class="block font-display text-[24px] font-semibold tabular-nums text-ink">@_board.Groups.Count</span>
+                <span class="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Groups</span>
             </div>
-            <div class="stat">
-                <span class="stat-value">@_overdue</span>
-                <span class="stat-label">Overdue</span>
+            <div class="ui-card px-4 py-3">
+                <span class="block font-display text-[24px] font-semibold tabular-nums @(_overdue > 0 ? "text-status-stuck" : "text-ink")">@_overdue</span>
+                <span class="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Overdue</span>
             </div>
-            <div class="stat">
-                <span class="stat-value">@_donePercent%</span>
-                <span class="stat-label">Done</span>
+            <div class="ui-card px-4 py-3">
+                <span class="block font-display text-[24px] font-semibold tabular-nums text-ink">@_donePercent%</span>
+                <span class="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Done</span>
             </div>
         </section>
 
-        <section aria-label="By status">
-            <h2 class="section-title">By status</h2>
-            @foreach (var lane in _byStatus)
-            {
-                <div class="bar-row">
-                    <span class="bar-label">@lane.Label</span>
-                    <span class="bar-track"><span class="bar-fill" style="@Width(lane.Count)"></span></span>
-                    <span class="bar-count">@lane.Count</span>
-                </div>
-            }
-        </section>
+        <div class="grid gap-4 lg:grid-cols-2">
+            <section class="ui-card p-4" aria-label="By status">
+                <h2 class="mb-3 font-display text-[15px] font-semibold text-ink">By status</h2>
+                @foreach (var lane in _byStatus)
+                {
+                    <div class="mb-2 flex items-center gap-3 last:mb-0">
+                        <span class="w-[110px] shrink-0 truncate text-[13px] text-ink-soft">@lane.Label</span>
+                        <span class="h-2.5 flex-1 overflow-hidden rounded-full bg-canvas">
+                            <span class="block h-full rounded-full" style="width:@(Width(lane.Count)); background:@StatusColour(lane.Label)"></span>
+                        </span>
+                        <span class="w-9 text-right text-[12px] tabular-nums text-ink-soft">@lane.Count</span>
+                    </div>
+                }
+            </section>
 
-        <section aria-label="By group">
-            <h2 class="section-title">By group</h2>
-            @foreach (var group in _board.Groups)
-            {
-                <div class="bar-row">
-                    <span class="bar-label">@group.Title</span>
-                    <span class="bar-track"><span class="bar-fill" style="@Width(group.Items.Count)"></span></span>
-                    <span class="bar-count">@group.Items.Count</span>
-                </div>
-            }
-        </section>
+            <section class="ui-card p-4" aria-label="By group">
+                <h2 class="mb-3 font-display text-[15px] font-semibold text-ink">By group</h2>
+                @for (var i = 0; i < _board.Groups.Count; i++)
+                {
+                    var group = _board.Groups[i];
+                    <div class="mb-2 flex items-center gap-3 last:mb-0">
+                        <span class="w-[110px] shrink-0 truncate text-[13px] text-ink-soft">@group.Title</span>
+                        <span class="h-2.5 flex-1 overflow-hidden rounded-full bg-canvas">
+                            <span class="block h-full rounded-full" style="width:@(Width(group.Items.Count)); background:@GroupColour(i)"></span>
+                        </span>
+                        <span class="w-9 text-right text-[12px] tabular-nums text-ink-soft">@group.Items.Count</span>
+                    </div>
+                }
+            </section>
 
-        <section aria-label="Automations">
-            <h2 class="section-title">Automations</h2>
-            @if (_automations.Count == 0)
-            {
-                <p class="meta">No automations on this board.</p>
-            }
-            else
-            {
-                <ul class="file-list">
-                    @foreach (var rule in _automations)
-                    {
-                        <li>
-                            <span class="file-name">@rule.Name</span>
-                            <span class="meta">@rule.Trigger · @(string.IsNullOrWhiteSpace(rule.Condition) ? "always" : rule.Condition)</span>
-                            <span class="tag @(rule.Enabled ? "tag-accent" : "tag-quiet")">@(rule.Enabled ? "on" : "off")</span>
-                        </li>
-                    }
-                </ul>
-            }
+            <section class="ui-card p-4" aria-label="Automations">
+                <h2 class="mb-3 font-display text-[15px] font-semibold text-ink">Automations</h2>
+                @if (_automations.Count == 0)
+                {
+                    <p class="text-sm text-ink-soft">No automations on this board.</p>
+                }
+                else
+                {
+                    <ul class="divide-y divide-line">
+                        @foreach (var rule in _automations)
+                        {
+                            <li class="flex flex-wrap items-center gap-2 py-2 first:pt-0 last:pb-0">
+                                <span class="text-[13px] font-medium text-ink">@rule.Name</span>
+                                <span class="text-[11px] text-ink-faint">@rule.Trigger · @(string.IsNullOrWhiteSpace(rule.Condition) ? "always" : rule.Condition)</span>
+                                <span class="ui-pill ml-auto @(rule.Enabled ? "bg-status-done/15 text-[#007a4d]" : "bg-canvas text-ink-faint")">@(rule.Enabled ? "on" : "off")</span>
+                            </li>
+                        }
+                    </ul>
+                }
 
-            <h3 class="section-sub">Recent runs</h3>
-            @if (_runs.Count == 0)
-            {
-                <p class="meta">Nothing has run yet. Edit a status cell to fire a rule.</p>
-            }
-            else
-            {
-                <ul class="file-list">
-                    @foreach (var run in _runs)
-                    {
-                        <li>
-                            <span class="tag @(run.Status == AutomationRunStatus.Succeeded ? "tag-accent" : "tag-quiet")">@run.Status</span>
-                            <span class="file-name">@run.Name</span>
-                            <span class="meta">@run.Message · @run.CreatedAt.ToLocalTime().ToString("d MMM, HH:mm")</span>
-                        </li>
-                    }
-                </ul>
-            }
-        </section>
+                <h3 class="mb-2 mt-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Recent runs</h3>
+                @if (_runs.Count == 0)
+                {
+                    <p class="text-sm text-ink-soft">Nothing has run yet. Edit a status cell to fire a rule.</p>
+                }
+                else
+                {
+                    <ul class="divide-y divide-line">
+                        @foreach (var run in _runs)
+                        {
+                            <li class="flex flex-wrap items-center gap-2 py-2 first:pt-0 last:pb-0">
+                                <span class="ui-pill @(run.Status == AutomationRunStatus.Succeeded ? "bg-status-done/15 text-[#007a4d]" : "bg-status-stuck/10 text-status-stuck")">@run.Status</span>
+                                <span class="text-[13px] font-medium text-ink">@run.Name</span>
+                                <span class="text-[11px] text-ink-faint">@run.Message · @run.CreatedAt.ToLocalTime().ToString("d MMM, HH:mm")</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
 
-        <section aria-label="Webhooks">
-            <h2 class="section-title">Webhooks</h2>
-            @if (_hooks.Count == 0)
-            {
-                <p class="meta">No webhooks registered. Register one through <code>POST /api/v1/boards/{BoardId}/webhooks</code>.</p>
-            }
-            else
-            {
-                <ul class="file-list">
-                    @foreach (var hook in _hooks)
-                    {
-                        <li>
-                            <span class="file-name">@hook.Url</span>
-                            <span class="meta">last status @(hook.LastStatus?.ToString() ?? "never") · @(hook.LastCalledAt?.ToLocalTime().ToString("d MMM, HH:mm") ?? "not called")</span>
-                            <span class="tag @(hook.Enabled ? "tag-accent" : "tag-quiet")">@(hook.Enabled ? "on" : "off")</span>
-                        </li>
-                    }
-                </ul>
-            }
-        </section>
+            <section class="ui-card p-4" aria-label="Webhooks">
+                <h2 class="mb-3 font-display text-[15px] font-semibold text-ink">Webhooks</h2>
+                @if (_hooks.Count == 0)
+                {
+                    <p class="text-sm text-ink-soft">
+                        No webhooks registered. Register one through
+                        <code class="rounded bg-canvas px-1 py-0.5 text-[12px] text-ink-soft">POST /api/v1/boards/{BoardId}/webhooks</code>.
+                    </p>
+                }
+                else
+                {
+                    <ul class="divide-y divide-line">
+                        @foreach (var hook in _hooks)
+                        {
+                            <li class="flex flex-wrap items-center gap-2 py-2 first:pt-0 last:pb-0">
+                                <span class="truncate text-[13px] font-medium text-ink">@hook.Url</span>
+                                <span class="text-[11px] text-ink-faint">last status @(hook.LastStatus?.ToString() ?? "never") · @(hook.LastCalledAt?.ToLocalTime().ToString("d MMM, HH:mm") ?? "not called")</span>
+                                <span class="ui-pill ml-auto @(hook.Enabled ? "bg-status-done/15 text-[#007a4d]" : "bg-canvas text-ink-faint")">@(hook.Enabled ? "on" : "off")</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+        </div>
     </main>
 }
 
@@ -187,7 +203,8 @@ else
                 .Select(group => (group.Key, group.Count()))
                 .ToList();
 
-        _max = Math.Max(1, _byStatus.Select(lane => lane.Count).DefaultIfEmpty(1).Concat(_board.Groups.Select(group => group.Items.Count)).Max());
+        // Bars read as a share of the board, so 125 of 500 fills a quarter of the track.
+        _max = Math.Max(1, _board.ItemCount);
 
         _overdue = dueColumn is null
             ? 0
@@ -208,6 +225,26 @@ else
         _hooks = await Hooks.ListAsync(BoardId);
     }
 
+    private static string StatusColour(string label) => label.Trim().ToLowerInvariant() switch
+    {
+        "done" => "#00C875",
+        "stuck" => "#C42B45",
+        "working on it" => "#FDAB3D",
+        "not started" => "#C4C4C4",
+        _ => "#6161FF"
+    };
+
+    /// <summary>Bar width as a bare percentage; the style attribute supplies the property.</summary>
+    /// <summary>Distinct bar colours per group, so the chart is readable at a glance.</summary>
+    private static string GroupColour(int index) => (index % 5) switch
+    {
+        0 => "#6161FF",
+        1 => "#579BFC",
+        2 => "#A25DDC",
+        3 => "#00C875",
+        _ => "#FDAB3D"
+    };
+
     private string Width(int count) =>
-        $"width:{(count * 100.0 / _max).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)}%";
+        (count * 100.0 / _max).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "%";
 }

@@ -96,3 +96,13 @@
     @apply flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-ink;
   }
 
+
+/* Sanitised update HTML. There is no typography plugin here, so the few elements the
+   allow-list can produce are styled explicitly. */
+.prose-update > * + * { margin-top: 0.4rem; }
+.prose-update p { margin: 0; }
+.prose-update ul, .prose-update ol { margin: 0; padding-left: 1.15rem; list-style: revert; }
+.prose-update blockquote { margin: 0; border-left: 3px solid var(--color-line); padding-left: 0.75rem; color: var(--color-ink-soft); }
+.prose-update code { border-radius: 4px; background: var(--color-canvas); padding: 0.1rem 0.3rem; font-size: 0.85em; }
+.prose-update a { color: var(--color-brand); text-decoration: underline; text-underline-offset: 2px; }
+.prose-update strong { font-weight: 600; }

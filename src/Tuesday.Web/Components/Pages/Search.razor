@@ -13,43 +13,44 @@
 
 <PageTitle>Search — Tuesday.com</PageTitle>
 
-<main class="shell">
-    <p class="eyebrow">Everything you can see</p>
-    <h1>Search</h1>
+<main class="mx-auto max-w-[900px]">
+    <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-soft">Everything you can see</p>
+    <h1 class="mt-1 font-display text-[26px] font-semibold leading-tight tracking-tight text-ink">Search</h1>
 
-    <form class="search-bar" method="get" action="/search" role="search">
-        <label class="field">
+    <form class="mt-4 flex gap-2" method="get" action="/search" role="search">
+        <label class="block flex-1">
             <span class="sr-only">Search items and updates</span>
-            <input type="search" name="q" value="@Query" placeholder="Item names and update text" autofocus />
+            <input type="search" name="q" value="@Query" placeholder="Item names and update text" autofocus
+                   class="h-10 w-full rounded-full border border-line-strong bg-surface px-4 text-sm text-ink outline-none transition placeholder:text-ink-faint focus:border-brand focus:ring-2 focus:ring-brand/20" />
         </label>
-        <button type="submit" class="btn">Search</button>
+        <button type="submit" class="ui-btn-primary h-10 px-5">Search</button>
     </form>
 
     @if (string.IsNullOrWhiteSpace(Query))
     {
-        <p class="lede">Search runs over the boards you can open — item names first, then what people wrote.</p>
+        <p class="mt-6 text-sm text-ink-soft">Search runs over the boards you can open — item names first, then what people wrote.</p>
     }
     else if (_hits is null)
     {
-        <p class="meta">Loading…</p>
+        <p class="mt-6 text-sm text-ink-faint">Loading…</p>
     }
     else if (_hits.Count == 0)
     {
-        <p class="lede">Nothing matches “@Query”.</p>
+        <p class="mt-6 text-sm text-ink-soft">Nothing matches “@Query”.</p>
     }
     else
     {
-        <p class="meta">@_hits.Count result@(_hits.Count == 1 ? string.Empty : "s") for “@Query”</p>
-        <ul class="search-results">
+        <p class="mt-5 text-xs text-ink-faint">@_hits.Count result@(_hits.Count == 1 ? string.Empty : "s") for “@Query”</p>
+        <ul class="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
             @foreach (var hit in _hits)
             {
-                <li>
-                    <span class="tag tag-quiet">@hit.Kind</span>
-                    <a href="@LinkFor(hit)">@hit.Title</a>
-                    <span class="meta">@hit.BoardName</span>
+                <li class="flex flex-wrap items-center gap-3 px-4 py-3 transition hover:bg-canvas/70">
+                    <span class="ui-pill @(hit.Kind == "update" ? "bg-brand-tint text-brand-ink" : "bg-canvas text-ink-soft")">@hit.Kind</span>
+                    <a class="text-[13px] font-medium text-ink no-underline hover:text-brand hover:underline" href="@LinkFor(hit)">@hit.Title</a>
+                    <span class="text-[11px] text-ink-faint">@hit.BoardName</span>
                     @if (hit.Kind == "update")
                     {
-                        <p class="meta">@hit.Snippet</p>
+                        <p class="w-full pl-1 text-[12px] text-ink-soft">@hit.Snippet</p>
                     }
                 </li>
             }

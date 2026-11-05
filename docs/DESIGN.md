@@ -75,6 +75,24 @@ Rules that keep it coherent:
 - The icon rail is `aria-label`led per link; grid cells carry `aria-label="Item: Column"`.
 - Row actions are hidden until hover but reachable by keyboard (`focus-visible:opacity-100`).
 
+## Surfaces
+
+| Surface | Where |
+|---|---|
+| Landing, sign-in | `Home.razor`, `Login.razor` (`EmptyLayout`) |
+| Workspace | `Workspace.razor` — board cards, create/invite cards |
+| Board shell | `BoardView.razor` — breadcrumb, title, view tabs |
+| Grid | `BoardGrid.razor` — virtualised rows, status cells, group bands |
+| Item | `ItemDetail.razor` + `UpdateThread` / `AttachmentPanel` |
+| Views | `KanbanView`, `CalendarView`, `TimelineView`, `GanttView` |
+| Dashboard | `BoardDashboard.razor` — stat cards, share-of-board bars |
+| Search, notifications, account | `Search`, `Notifications`, `ApiTokens`, `AccountSecurity` |
+| Status pages | `Denied`, `NotFound`, `Error` |
+
+The four board views keep their geometry in `wwwroot/app.css` (calendar cells, timeline
+tracks, gantt paths are positioning logic, not decoration); their colour, type and chrome
+were moved onto the tokens above.
+
 ## Building the CSS
 
 ```bash

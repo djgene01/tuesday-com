@@ -43,16 +43,16 @@ a { color: var(--tue-accent); text-underline-offset: 3px; }
 a:focus-visible, button:focus-visible { outline: 3px solid var(--tue-accent); outline-offset: 2px; }
 
 .shell {
-  max-width: 60rem;
+  max-width: 72rem;
   margin: 0 auto;
-  padding: 3.5rem 1.5rem 4rem;
+  padding: 0;
 }
 
 .masthead { margin-bottom: 2.5rem; }
 
 .eyebrow {
-  margin: 0 0 .75rem;
-  font-size: .78rem;
+  margin: 0 0 .4rem;
+  font-size: .68rem;
   font-weight: 600;
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -76,18 +76,18 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--tue-accent); ou
 .panel {
   background: var(--tue-surface);
   border: 1px solid var(--tue-line);
-  border-radius: var(--tue-radius);
-  padding: 1.5rem;
-  margin-bottom: 1.25rem;
+  border-radius: 10px;
+  padding: 1.15rem 1.25rem;
+  margin-bottom: 1rem;
 }
 
 .panel h2 {
-  font-size: .82rem;
-  font-weight: 700;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--tue-ink-soft);
-  margin-bottom: 1rem;
+  font-family: "Poppins", system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--tue-ink);
+  margin: 0 0 .75rem;
 }
 
 .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
@@ -231,12 +231,12 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--tue-accent); ou
 .field { display: block; margin: 1rem 0; }
 .field span {
   display: block;
-  font-size: .8rem;
+  margin-bottom: .3rem;
+  font-size: .68rem;
   font-weight: 600;
-  letter-spacing: .04em;
+  letter-spacing: .06em;
   text-transform: uppercase;
   color: var(--tue-ink-soft);
-  margin-bottom: .3rem;
 }
 
 .field input,
@@ -262,20 +262,22 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--tue-accent); ou
   padding: .6rem 1.1rem;
   font: inherit;
   font-weight: 600;
+  font-size: .87rem;
   color: #fff;
   background: var(--tue-accent);
   border: 0;
-  border-radius: 7px;
+  border-radius: 999px;
   cursor: pointer;
+  transition: background .15s ease;
 }
 
-.btn-primary:hover { background: #362da8; }
+.btn-primary:hover { background: #5151d5; }
 
 .alert {
-  margin: 1rem 0;
-  padding: .65rem .8rem;
+  margin: .8rem 0;
+  padding: .6rem .8rem;
   border-radius: 8px;
-  font-size: .92rem;
+  font-size: .85rem;
 }
 
 .alert-bad { color: var(--tue-bad); background: var(--tue-bad-bg); }
@@ -299,14 +301,14 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--tue-accent); ou
 .board-name:hover { color: var(--tue-accent); text-decoration: underline; }
 
 .tag {
-  font-size: .74rem;
-  font-weight: 600;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  padding: .18rem .45rem;
+  display: inline-flex;
+  align-items: center;
+  padding: .12rem .5rem;
   border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 500;
   color: var(--tue-ink-soft);
-  background: #eceff4;
+  background: var(--tue-canvas);
 }
 
 .tag-quiet { background: transparent; border: 1px solid var(--tue-line); }
@@ -578,10 +580,10 @@ table.grid {
 
 .lane {
   flex: 0 0 17rem;
-  background: var(--tue-canvas);
+  background: var(--tue-surface);
   border: 1px solid var(--tue-line);
-  border-radius: var(--tue-radius);
-  padding: .5rem;
+  border-radius: 10px;
+  padding: .65rem;
   min-height: 8rem;
 }
 
@@ -594,13 +596,13 @@ table.grid {
   padding: .2rem .2rem .5rem;
 }
 
-.lane-head h2 { font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; }
-.lane-swatch { width: .6rem; height: .6rem; border-radius: 50%; background: var(--tue-ink-soft); }
+.lane-head h2 { font-size: .82rem; font-weight: 600; letter-spacing: 0; }
+.lane-swatch { width: .62rem; height: .62rem; border-radius: 50%; background: var(--tue-ink-soft); }
 
-.status-not-started { background: #64748b; }
-.status-working-on-it { background: #b45309; }
-.status-stuck { background: #b91c1c; }
-.status-done { background: #0f766e; }
+.status-not-started { background: #c4c4c4; }
+.status-working-on-it { background: #fdab3d; }
+.status-stuck { background: #c42b45; }
+.status-done { background: #00c875; }
 
 .lane-cards { display: flex; flex-direction: column; gap: .4rem; }
 
@@ -617,11 +619,13 @@ table.grid {
 .kcard {
   background: var(--tue-surface);
   border: 1px solid var(--tue-line);
-  border-radius: 6px;
-  padding: .45rem .55rem;
+  border-radius: 8px;
+  padding: .5rem .6rem;
   cursor: grab;
-  box-shadow: 0 1px 1px rgb(15 23 42 / 6%);
+  transition: box-shadow .15s ease, border-color .15s ease;
 }
+
+.kcard:hover { border-color: var(--tue-line-strong, #d0d4e4); box-shadow: 0 4px 12px rgb(29 33 57 / 8%); }
 
 .kcard:focus-visible { outline: 3px solid var(--tue-accent); outline-offset: 2px; }
 .kcard[draggable="false"] { cursor: default; }
@@ -654,7 +658,7 @@ table.grid {
   cursor: pointer;
 }
 
-.mode.is-active { background: var(--tue-accent); border-color: var(--tue-accent); color: #fff; }
+.mode.is-active { background: var(--tue-accent); border-color: var(--tue-accent); color: #fff; font-weight: 600; }
 .mode:focus-visible { outline: 3px solid var(--tue-accent); outline-offset: 2px; }
 
 .cal-weekdays,
@@ -664,7 +668,7 @@ table.grid {
 }
 
 .cal-weekdays {
-  font-size: .72rem;
+  font-size: .68rem; font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .05em;
   color: var(--tue-ink-soft);
@@ -687,7 +691,7 @@ table.grid {
 }
 
 .cal-day.is-outside { background: var(--tue-canvas); color: var(--tue-ink-soft); }
-.cal-day.is-today { box-shadow: inset 0 0 0 2px var(--tue-accent); }
+.cal-day.is-today { box-shadow: inset 0 0 0 2px var(--tue-accent); background: #fafaff; }
 .cal-day-head { display: flex; align-items: center; justify-content: space-between; }
 .cal-day-num { font-size: .78rem; font-variant-numeric: tabular-nums; color: var(--tue-ink-soft); }
 .cal-cards { display: flex; flex-direction: column; gap: .25rem; margin-top: .25rem; }
@@ -700,7 +704,7 @@ table.grid {
   border-radius: var(--tue-radius);
 }
 
-.cal-undated h2 { font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; }
+.cal-undated h2 { font-size: .85rem; font-weight: 600; letter-spacing: 0; }
 
 /* timeline + gantt */
 
@@ -754,7 +758,7 @@ table.grid {
 .tl-bar:active { cursor: grabbing; }
 .tl-bar.is-dragging { opacity: .8; }
 .tl-bar-text { font-size: .7rem; font-weight: 600; white-space: nowrap; }
-.tl-bar-gantt { cursor: default; background: #0f766e; }
+.tl-bar-gantt { cursor: default; background: var(--tue-accent); }
 
 .tl-actions { display: flex; gap: .2rem; opacity: .45; }
 .tl-row:hover .tl-actions, .tl-row:focus-within .tl-actions { opacity: 1; }
@@ -767,7 +771,7 @@ table.grid {
   /* Without an explicit height the SVG takes its height from the viewBox aspect ratio,
      which stretches a 1360-unit chart to ~16000px and pushes every arrow off screen. */
   height: 100%;
-  color: #b45309;
+  color: #8a4b00;
   pointer-events: none;
   z-index: 3;
   overflow: visible;
@@ -788,10 +792,10 @@ table.grid {
   height: 0;
   border-top: 6px solid transparent;
   border-bottom: 6px solid transparent;
-  border-left: 10px solid #b45309;
+  border-left: 10px solid var(--tue-accent);
   filter: drop-shadow(0 0 1px #fff);
 }
-.gantt-links-panel h2 { font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; }
+.gantt-links-panel h2 { font-size: .85rem; font-weight: 600; letter-spacing: 0; }
 .gantt-form { display: flex; align-items: flex-end; gap: .6rem; flex-wrap: wrap; margin: .4rem 0; }
 .gantt-link-list { list-style: none; margin: .5rem 0 0; padding: 0; display: flex; flex-direction: column; gap: .25rem; }
 .gantt-link-list li { display: flex; align-items: center; justify-content: space-between; gap: .5rem; font-size: .82rem; border-top: 1px solid var(--tue-line); padding-top: .25rem; }
@@ -852,12 +856,12 @@ table.grid {
 }
 
 .item-field { display: flex; flex-direction: column; gap: .1rem; }
-.item-field-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--tue-ink-soft); }
+.item-field-label { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--tue-ink-soft); }
 .item-field-value { font-size: .88rem; color: var(--tue-ink); }
 
 .thread { border-top: 1px solid var(--tue-line); padding-top: 1rem; }
 .thread-head { display: flex; align-items: baseline; gap: .8rem; }
-.thread-head h2 { font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; }
+.thread-head h2 { font-size: .85rem; font-weight: 600; letter-spacing: 0; }
 
 .composer {
   margin: .6rem 0 1rem;

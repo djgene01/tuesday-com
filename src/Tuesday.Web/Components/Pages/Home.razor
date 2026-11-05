@@ -3,51 +3,66 @@
 @inject HealthCheckService HealthChecks
 @inject IHostEnvironment Environment
 
-<PageTitle>Tuesday.com — infrastructure status</PageTitle>
+<PageTitle>Tuesday.com — a work operating system you can run yourself</PageTitle>
 
-<main class="shell">
-    <header class="masthead">
-        <p class="eyebrow">Walking skeleton · phase P0</p>
-        <h1>Tuesday<span class="dot">.</span>com</h1>
-        <p class="lede">
-            The work operating system is not built yet. This page exists to prove the
-            pipeline is real: the host starts, configuration is validated, dependencies are
-            probed, and every request carries a correlation id.
+<main class="mx-auto max-w-[1040px] py-6">
+    <section class="mb-10 max-w-[640px]">
+        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-ink">Work operating system</p>
+        <h1 class="mt-2 font-display text-[42px] font-semibold leading-[1.08] tracking-[-0.03em] text-ink">
+            Every board, view and conversation<br />in one place.
+        </h1>
+        <p class="mt-4 text-[15px] leading-relaxed text-ink-soft">
+            Boards with typed columns, five ways to look at the same data, threaded updates,
+            automations and a signed API — running on your own infrastructure.
         </p>
-    </header>
+        <div class="mt-6 flex flex-wrap items-center gap-2">
+            <a class="ui-btn-primary !h-10 !px-5" href="/workspace">Open your workspace</a>
+            <a class="ui-btn-ghost !h-10 !px-5" href="/login">Sign in</a>
+        </div>
+    </section>
 
-    <section class="panel" aria-labelledby="deps">
-        <h2 id="deps">Dependencies</h2>
-        <ul class="checks">
+    <section class="ui-card overflow-hidden" aria-labelledby="deps">
+        <header class="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
+            <h2 id="deps" class="font-display text-[15px] font-semibold text-ink">Live status</h2>
+            <span class="ui-pill @(_report.Status == HealthStatus.Healthy ? "bg-status-done/15 text-[#007a4d]" : "bg-status-working/20 text-[#8a4b00]")">
+                @_report.Status
+            </span>
+            <span class="ml-auto text-[11px] text-ink-faint">checked @_checkedAt.ToString("HH:mm:ss") UTC</span>
+        </header>
+
+        <ul class="divide-y divide-line">
             @foreach (var entry in _report.Entries)
             {
-                <li class="check @StatusClass(entry.Value.Status)">
-                    <span class="badge">@entry.Value.Status</span>
-                    <span class="check-name">@entry.Key</span>
-                    <span class="check-detail">@entry.Value.Description</span>
+                <li class="flex flex-wrap items-center gap-3 px-4 py-2.5">
+                    <span class="h-2 w-2 rounded-full @(entry.Value.Status == HealthStatus.Healthy ? "bg-status-done" : entry.Value.Status == HealthStatus.Degraded ? "bg-status-working" : "bg-status-stuck")" aria-hidden="true"></span>
+                    <span class="w-[110px] text-[13px] font-medium text-ink">@entry.Key</span>
+                    <span class="text-[12px] text-ink-soft">@entry.Value.Description</span>
+                    <span class="ml-auto text-[11px] font-medium @(entry.Value.Status == HealthStatus.Healthy ? "text-[#007a4d]" : "text-status-stuck")">@entry.Value.Status</span>
                 </li>
             }
         </ul>
-        <p class="meta">
-            Overall: <strong>@_report.Status</strong> · checked @_checkedAt.ToString("HH:mm:ss") UTC
-        </p>
     </section>
 
-    <section class="panel" aria-labelledby="runtime">
-        <h2 id="runtime">Runtime</h2>
-        <dl class="facts">
-            <div><dt>Environment</dt><dd>@Environment.EnvironmentName</dd></div>
-            <div><dt>Runtime</dt><dd>@System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription</dd></div>
-            <div><dt>Machine</dt><dd>@System.Environment.MachineName</dd></div>
-            <div><dt>Started</dt><dd>@_startedAt.ToString("yyyy-MM-dd HH:mm:ss") UTC</dd></div>
-        </dl>
-    </section>
+    <section class="mt-4 grid gap-3 sm:grid-cols-2" aria-labelledby="runtime">
+        <div class="ui-card p-4">
+            <h2 id="runtime" class="mb-2 font-display text-[15px] font-semibold text-ink">Runtime</h2>
+            <dl class="space-y-1.5 text-[12px]">
+                <div class="flex justify-between gap-3"><dt class="text-ink-soft">Environment</dt><dd class="text-ink">@Environment.EnvironmentName</dd></div>
+                <div class="flex justify-between gap-3"><dt class="text-ink-soft">Runtime</dt><dd class="text-ink">@System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription</dd></div>
+                <div class="flex justify-between gap-3"><dt class="text-ink-soft">Started</dt><dd class="text-ink">@_startedAt.ToString("yyyy-MM-dd HH:mm:ss") UTC</dd></div>
+            </dl>
+        </div>
 
-    <footer class="foot">
-        <a href="/health/ready">/health/ready</a>
-        <a href="/health/live">/health/live</a>
-        <span>Phase P0 gate: build clean, health green, page visible.</span>
-    </footer>
+        <div class="ui-card p-4">
+            <h2 class="mb-2 font-display text-[15px] font-semibold text-ink">Probes</h2>
+            <div class="flex flex-col gap-2 text-[12px]">
+                <a class="flex items-center justify-between gap-3 rounded-control border border-line px-3 py-2 text-ink no-underline hover:border-line-strong hover:bg-canvas"
+                   href="/health/ready"><span>Readiness</span><code class="text-ink-soft">/health/ready</code></a>
+                <a class="flex items-center justify-between gap-3 rounded-control border border-line px-3 py-2 text-ink no-underline hover:border-line-strong hover:bg-canvas"
+                   href="/health/live"><span>Liveness</span><code class="text-ink-soft">/health/live</code></a>
+            </div>
+        </div>
+    </section>
 </main>
 
 @code {

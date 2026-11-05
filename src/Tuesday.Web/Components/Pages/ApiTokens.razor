@@ -11,19 +11,24 @@
 
 <PageTitle>API tokens — Tuesday.com</PageTitle>
 
-<main class="shell">
-    <p class="eyebrow">Your account</p>
-    <h1>API tokens</h1>
-    <p class="lede">A token calls <code>/api/v1</code> as you. It is shown once, stored hashed, and can be revoked here at any time.</p>
+<main class="mx-auto max-w-[820px]">
+    <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-soft">Your account</p>
+    <h1 class="mt-1 font-display text-[26px] font-semibold leading-tight tracking-tight text-ink">API tokens</h1>
+    <p class="mt-1 text-sm text-ink-soft">
+        A token calls <code class="rounded bg-canvas px-1 py-0.5 text-[12px]">/api/v1</code> as you.
+        It is shown once, stored hashed, and can be revoked here at any time.
+    </p>
 
-    <div class="composer">
-        <label class="field">
-            <span>Token name</span>
-            <input type="text" @bind="_name" @bind:event="oninput" placeholder="CI import" aria-label="Token name" />
+    <div class="ui-card mt-4 p-4">
+        <label class="block">
+            <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Token name</span>
+            <input type="text" @bind="_name" @bind:event="oninput" placeholder="CI import" aria-label="Token name"
+                   class="h-10 w-full rounded-control border border-line-strong bg-surface px-3 text-sm text-ink outline-none transition placeholder:text-ink-faint focus:border-brand focus:ring-2 focus:ring-brand/20" />
         </label>
-        <div class="composer-actions">
-            <p class="meta">Requests are limited to 120 per minute per token.</p>
-            <button type="button" class="btn" disabled="@(string.IsNullOrWhiteSpace(_name) || _busy)" @onclick="IssueAsync">
+        <div class="mt-3 flex flex-wrap items-center gap-3">
+            <p class="text-[11px] text-ink-faint">Requests are limited to 120 per minute per token.</p>
+            <button type="button" class="ui-btn-primary ml-auto !h-9 px-4 text-[13px] disabled:opacity-50"
+                    disabled="@(string.IsNullOrWhiteSpace(_name) || _busy)" @onclick="IssueAsync">
                 Create token
             </button>
         </div>
@@ -31,36 +36,36 @@
 
     @if (_issued is not null)
     {
-        <div class="alert alert-good" role="status">
-            <strong>Copy it now — it is not shown again.</strong>
-            <code class="token-value">@_issued</code>
+        <div class="mt-4 rounded-lg border border-status-done/30 bg-status-done/10 px-4 py-3" role="status">
+            <p class="text-[13px] font-semibold text-[#007a4d]">Copy it now — it is not shown again.</p>
+            <code class="mt-1 block truncate rounded bg-white/70 px-2 py-1 text-[12px] text-ink">@_issued</code>
         </div>
     }
 
     @if (_error is not null)
     {
-        <p class="alert alert-bad" role="alert">@_error</p>
+        <p class="mt-4 rounded-lg border border-status-stuck/30 bg-status-stuck/10 px-4 py-2 text-sm text-status-stuck" role="alert">@_error</p>
     }
 
     @if (_rows is null)
     {
-        <p class="meta">Loading…</p>
+        <p class="mt-4 text-sm text-ink-faint">Loading…</p>
     }
     else if (_rows.Count == 0)
     {
-        <p class="meta">No tokens yet.</p>
+        <p class="mt-4 text-sm text-ink-soft">No tokens yet.</p>
     }
     else
     {
-        <ul class="file-list">
+        <ul class="mt-4 divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
             @foreach (var row in _rows)
             {
-                <li>
-                    <span class="file-name">@row.Name</span>
-                    <span class="meta">@row.Prefix… @(row.IsActive ? "active" : "revoked") · created @row.CreatedAt.ToLocalTime().ToString("d MMM yyyy")</span>
+                <li class="flex flex-wrap items-center gap-3 px-4 py-3">
+                    <span class="text-[13px] font-medium text-ink">@row.Name</span>
+                    <span class="text-[11px] text-ink-faint">@row.Prefix… @(row.IsActive ? "active" : "revoked") · created @row.CreatedAt.ToLocalTime().ToString("d MMM yyyy")</span>
                     @if (row.IsActive)
                     {
-                        <button type="button" class="btn-quiet" @onclick="() => RevokeAsync(row.Id)" disabled="@_busy">Revoke</button>
+                        <button type="button" class="ui-btn-quiet ml-auto !h-7 !px-2.5 text-[11px] hover:text-status-stuck" @onclick="() => RevokeAsync(row.Id)" disabled="@_busy">Revoke</button>
                     }
                 </li>
             }

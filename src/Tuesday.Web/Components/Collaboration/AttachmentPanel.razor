@@ -9,41 +9,42 @@
 @inject ITenantContext Tenant
 @inject TenantContextBootstrapper Bootstrapper
 
-<section class="attachments" aria-label="Attachments">
-    <header class="thread-head">
-        <h2>Attachments</h2>
-        <p class="meta">@(_rows is null ? "Loading" : $"{_rows.Count} file{(_rows.Count == 1 ? string.Empty : "s")}")</p>
+<section class="ui-card mt-4 overflow-hidden" aria-label="Attachments">
+    <header class="flex items-center gap-3 border-b border-line px-4 py-3">
+        <h2 class="font-display text-[15px] font-semibold text-ink">Attachments</h2>
+        <p class="text-xs text-ink-faint">@(_rows is null ? "Loading" : $"{_rows.Count} file{(_rows.Count == 1 ? string.Empty : "s")}")</p>
     </header>
 
     @if (CanEdit)
     {
-        <div class="composer">
-            <label class="field">
-                <span>Add a file (up to 25 MB)</span>
-                <InputFile OnChange="UploadAsync" class="file-input" />
+        <div class="border-b border-line px-4 py-3">
+            <label class="block">
+                <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Add a file (up to 25 MB)</span>
+                <InputFile OnChange="UploadAsync"
+                           class="block w-full cursor-pointer rounded-control border border-dashed border-line-strong bg-canvas px-3 py-2 text-sm text-ink-soft file:mr-3 file:rounded-full file:border-0 file:bg-brand-tint file:px-3 file:py-1 file:text-[12px] file:font-medium file:text-brand-ink hover:border-brand/40" />
             </label>
-            <p class="meta">Files are private to this item. Links expire after one hour.</p>
+            <p class="mt-1.5 text-[11px] text-ink-faint">Files are private to this item. Links expire after one hour.</p>
         </div>
     }
 
     @if (_error is not null)
     {
-        <p class="alert alert-bad" role="alert">@_error</p>
+        <p class="border-b border-line bg-status-stuck/10 px-4 py-2 text-sm text-status-stuck" role="alert">@_error</p>
     }
 
     @if (_rows is { Count: 0 })
     {
-        <p class="meta">No files yet.</p>
+        <p class="px-4 py-6 text-center text-sm text-ink-soft">No files yet.</p>
     }
     else if (_rows is not null)
     {
-        <ul class="file-list">
+        <ul class="file-list divide-y divide-line">
             @foreach (var row in _rows)
             {
-                <li>
-                    <span class="file-name">@row.FileName</span>
-                    <span class="meta">@Size(row.ByteSize) · @row.CreatedAt.ToLocalTime().ToString("d MMM, HH:mm")</span>
-                    <a class="row-open" href="@DownloadHref(row)" download>Download</a>
+                <li class="flex flex-wrap items-center gap-3 px-4 py-2.5">
+                    <span class="text-[13px] font-medium text-ink">@row.FileName</span>
+                    <span class="text-[11px] text-ink-faint">@Size(row.ByteSize) · @row.CreatedAt.ToLocalTime().ToString("d MMM, HH:mm")</span>
+                    <a class="ui-btn-ghost ml-auto !h-7 !px-2.5 text-[11px]" href="@DownloadHref(row)" download>Download</a>
                 </li>
             }
         </ul>
