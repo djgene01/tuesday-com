@@ -33,6 +33,10 @@ services:
       IdentityServer__ClientSecret: ${IDENTITY_CLIENT_SECRET:?set IDENTITY_CLIENT_SECRET}
       IdentityServer__SigningCertificatePath: /var/tuesday/keys/idp.pfx
       IdentityServer__SigningCertificatePassword: ${IDENTITY_SIGNING_PASSWORD:?set IDENTITY_SIGNING_PASSWORD}
+      # First admin, created only while the installation is empty. Leave unset after the first
+      # successful start; the values are ignored once a tenant exists.
+      Bootstrap__AdminEmail: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      Bootstrap__AdminPassword: ${BOOTSTRAP_ADMIN_PASSWORD:-}
     ports:
       - "127.0.0.1:8080:8080"
     volumes:

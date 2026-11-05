@@ -26,6 +26,13 @@ RUN dotnet publish src/Tuesday.Web/Tuesday.Web.csproj -c Release -o /app/publish
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
+# Npgsql probes GSSAPI when it negotiates a connection; without the library every start logs
+# "Cannot load library libgssapi_krb5.so.2" even though it falls back cleanly. Install it so a
+# clean log stays a useful signal.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgssapi-krb5-2 \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV ASPNETCORE_URLS=http://0.0.0.0:8080 \
     DOTNET_RUNNING_IN_CONTAINER=true \
     Storage__Root=/var/tuesday/files

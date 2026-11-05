@@ -182,6 +182,28 @@
             userId);
 
         Db.Boards.Add(board);
+
+        // A board with no groups, columns or view renders "no items yet" and cannot accept work —
+        // which is what a fresh Production install hit. Give every new board a usable skeleton.
+        Db.ItemGroups.AddRange(
+            Tuesday.Domain.Boards.ItemGroup.Create(tenantId, board.Id, "Backlog", "slate", 0),
+            Tuesday.Domain.Boards.ItemGroup.Create(tenantId, board.Id, "In progress", "amber", 1),
+            Tuesday.Domain.Boards.ItemGroup.Create(tenantId, board.Id, "Done", "teal", 2));
+
+        Db.BoardColumns.AddRange(
+            Tuesday.Domain.Boards.BoardColumn.Create(tenantId, board.Id, "status", "Status",
+                Tuesday.Domain.Boards.ColumnType.Status, 0,
+                """{"labels":["Not started","Working on it","Stuck","Done"]}"""),
+            Tuesday.Domain.Boards.BoardColumn.Create(tenantId, board.Id, "owner", "Owner",
+                Tuesday.Domain.Boards.ColumnType.People, 1),
+            Tuesday.Domain.Boards.BoardColumn.Create(tenantId, board.Id, "due", "Due date",
+                Tuesday.Domain.Boards.ColumnType.Date, 2),
+            Tuesday.Domain.Boards.BoardColumn.Create(tenantId, board.Id, "notes", "Notes",
+                Tuesday.Domain.Boards.ColumnType.Text, 3));
+
+        Db.BoardViews.Add(Tuesday.Domain.Views.BoardView.Create(
+            tenantId, board.Id, "Main table", Tuesday.Domain.Views.ViewType.Grid, 0));
+
         Db.AuditEntries.Add(Tuesday.Domain.Auditing.AuditEntry.Record(
             tenantId, userId, "board.created", nameof(Tuesday.Domain.Workspaces.Board), board.Id.ToString(), board.Name));
 

@@ -1,7 +1,21 @@
-# Release notes — Tuesday.com 0.9.0 (release candidate)
+# Release notes — Tuesday.com 0.9.3 (release candidate)
 
 **Status:** release candidate for an internal work-tracking deployment. Not 1.0.
-**Date:** 2026-11-04 · **Version:** 0.9.0 · **Image tag:** `tuesday-web:0.9.0`
+**Date:** 2026-11-05 · **Version:** 0.9.3 · **Image tag:** `tuesday-web:0.9.3`
+
+Changes since 0.9.2:
+
+- **Production first run is now usable.** Migrations run in every environment (they were
+  Development-only), an empty installation can be given its first admin from
+  `Bootstrap__AdminEmail` / `Bootstrap__AdminPassword`, new boards are scaffolded with three
+  groups, four columns and a grid view, and the grid has an "+ Add item" row. Before this, a
+  Production container started healthy with no schema, and a fresh board could never receive
+  its first item.
+- **Automation chains**: ordered multi-action rules with a depth-3 `LoopPrevented` guard.
+- **MCP server**: `src/Tuesday.Mcp`, four tools over stdio, plus a Claude Code skill.
+- `libgssapi-krb5-2` in the runtime image; the Kerberos load warning is gone.
+- Known gap found in this pass: invited people are created with the shared demo password
+  (P6-18).
 
 This build exists so the team has a real, installable system to work from while the UI/UX pass
 begins. It is feature-complete for the core loop — boards, views, collaboration, automations,

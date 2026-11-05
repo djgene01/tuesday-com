@@ -82,6 +82,45 @@ public sealed class DevelopmentSeeder(
     }
 
     /// <summary>
+    /// Prepares an empty installation for its first sign-in. Refuses to touch an instance that
+    /// already has a tenant, so calling it on every start is safe.
+    /// </summary>
+    public async Task<bool> BootstrapAdminAsync(
+        string email,
+        string password,
+        CancellationToken cancellationToken = default)
+    {
+        if (await dbContext.Tenants.IgnoreQueryFilters().AnyAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return false;
+        }
+
+        var tenant = Tenant.Create("Workspace", "default");
+        dbContext.Tenants.Add(tenant);
+
+        var admin = await EnsureUserAsync(email, "Administrator", password).ConfigureAwait(false);
+
+        dbContext.Memberships.Add(Membership.Create(tenant.Id, admin.Id, TenantRole.Admin));
+
+        var workspace = Workspace.Create(tenant.Id, "My workspace", WorkspaceVisibility.Open, admin.Id);
+        dbContext.Workspaces.Add(workspace);
+
+        dbContext.AuditEntries.Add(AuditEntry.Record(
+            tenant.Id,
+            admin.Id,
+            "tenant.created",
+            nameof(Tenant),
+            tenant.Id.ToString(),
+            "First admin bootstrap"));
+
+        await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        logger.LogInformation("Bootstrapped tenant {Slug} with first admin {Email}.", tenant.Slug, email);
+
+        return true;
+    }
+
+    /// <summary>
     /// Gives the demo board a realistic shape: eight columns, three groups and 500 items
     /// with four populated columns each.
     /// </summary>

@@ -807,14 +807,15 @@ app.MapPost("/logout", async (SignInManager<ApplicationUser> signInManager) =>
     return Results.Redirect("/");
 }).RequireAuthorization();
 
-if (app.Environment.IsDevelopment())
-{
-    await ApplyMigrationsAndSeedAsync(app).ConfigureAwait(false);
-}
+await PrepareDatabaseAsync(app).ConfigureAwait(false);
 
 await app.RunAsync().ConfigureAwait(false);
 
-static async Task ApplyMigrationsAndSeedAsync(WebApplication app)
+/// <summary>
+/// Schema work belongs to every environment; demo content belongs to Development only.
+/// Production gets one admin from configuration, and only on a genuinely empty installation.
+/// </summary>
+static async Task PrepareDatabaseAsync(WebApplication app)
 {
     await using var scope = app.Services.CreateAsyncScope();
     var services = scope.ServiceProvider;
@@ -835,9 +836,29 @@ static async Task ApplyMigrationsAndSeedAsync(WebApplication app)
 
         await dbContext.Database.MigrateAsync().ConfigureAwait(false);
 
-        var password = app.Configuration["Seed:AdminPassword"] ?? "Tuesday!Demo1";
         var seeder = services.GetRequiredService<DevelopmentSeeder>();
-        await seeder.SeedAsync(password).ConfigureAwait(false);
+
+        if (app.Environment.IsDevelopment())
+        {
+            var password = app.Configuration["Seed:AdminPassword"] ?? "Tuesday!Demo1";
+            await seeder.SeedAsync(password).ConfigureAwait(false);
+        }
+        else
+        {
+            var email = app.Configuration["Bootstrap:AdminEmail"];
+            var bootstrapPassword = app.Configuration["Bootstrap:AdminPassword"];
+
+            if (!string.IsNullOrWhiteSpace(email) && !string.IsNullOrWhiteSpace(bootstrapPassword))
+            {
+                await seeder.BootstrapAdminAsync(email, bootstrapPassword).ConfigureAwait(false);
+            }
+            else
+            {
+                app.Logger.LogWarning(
+                    "No Bootstrap:AdminEmail/AdminPassword configured. If this installation is "
+                    + "empty it has no way to sign in; set both and restart.");
+            }
+        }
 
         // The OAuth client lives in the same database as the users it authenticates.
         await Tuesday.Web.Security.IdentityServerSetup
