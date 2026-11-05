@@ -101,7 +101,7 @@ comparison behind `--profile legacy-mysql` in `docker/compose.yaml`.
   PostgreSQL and Redis: `/health/ready` returned `Healthy` and `/login` returned 200, and a
   token request over plain HTTP was correctly refused in Production. It has **not**
   been deployed to a server.
-- **Not yet:** FULLTEXT search, a Redis backplane for multi-instance realtime, webhook retries,
+- **Not yet:** FULLTEXT search, a Redis backplane for multi-instance realtime, webhook timestamped signatures,
   backup/restore runbook execution, signed release artifacts, and a Firefox/WebKit accessibility
   pass.
 

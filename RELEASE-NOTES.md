@@ -19,7 +19,7 @@ API — and deliberately unproven on operational load. Read "Known limitations" 
 | Views | Kanban, calendar, timeline, Gantt |
 | Collaboration | Threaded updates with HTML sanitisation, likes, reply/edit/delete, notifications, email preference, in-app search |
 | Automations | Trigger → condition → action rules; scheduled date-passed sweep with per-item-per-day dedupe |
-| Integrations | Signed webhooks with challenge handshake, REST API, OpenAPI-less but stable JSON |
+| Integrations | Signed webhooks with challenge handshake, REST API with cursor pagination, idempotency keys, per-token quota and a committed OpenAPI snapshot |
 | Dashboard | Per-board counts, by-status and by-group breakdown, automation run history |
 | Ops | `/health/live`, `/health/ready`, correlation ids, security headers, Docker image, Compose stack |
 
@@ -59,8 +59,11 @@ Stated plainly because they are real. Each maps to an open item in
 10. **Operator runbooks are incomplete.** Only the signing-certificate runbook exists
     (`docs/runbooks/`). Restore, session revocation, replica drain, automation disable and
     disk recovery are not written.
-11. **API hardening is partial.** No cursor pagination, no `Idempotency-Key`, no SSRF guard on
-    webhook URLs, no automatic webhook retry or auto-disable.
+11. **API hardening is partial.** Cursor pagination, `Idempotency-Key`, a per-token daily quota,
+    an SSRF guard and webhook retry/auto-disable are shipped and tested. Still missing: OpenAPI
+    coverage is a single document snapshot rather than per-endpoint contract tests, the webhook
+    signature carries no timestamp so a captured body can be replayed inside its window, and
+    webhook retries run inline with the triggering request instead of on a durable queue.
 12. **No accessibility audit.** axe has not been run on primary routes.
 13. **Guests cannot search across boards** and see only granted items.
 14. **Sign-in rejects accounts with a second factor over the password grant** by design; use the

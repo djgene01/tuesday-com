@@ -44,6 +44,13 @@ public sealed class Item : ITenantOwned
 
     public int Position { get; private set; }
 
+    /// <summary>
+    /// Database-assigned monotonic sequence. It exists so the public API can page with a
+    /// cursor that is stable under reordering: <see cref="Position"/> repeats across groups
+    /// and changes when a row is dragged.
+    /// </summary>
+    public long Seq { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public static Item Create(

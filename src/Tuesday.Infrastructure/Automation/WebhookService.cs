@@ -32,6 +32,9 @@ public sealed class WebhookService(
             .ConfigureAwait(false);
     }
 
+    /// <summary>Attempts per delivery before the failure counts towards the disable threshold.</summary>
+    public const int MaxDeliveryAttempts = 5;
+
     public async Task<(bool Succeeded, Guid Id, string? Error)> RegisterAsync(
         Guid tenantId,
         Guid boardId,
@@ -39,6 +42,12 @@ public sealed class WebhookService(
         Guid createdBy,
         CancellationToken cancellationToken = default)
     {
+        // Checked before anything is stored, and again before every delivery below.
+        if (await OutboundUrlPolicy.ValidateAsync(url, cancellationToken).ConfigureAwait(false) is { } blocked)
+        {
+            return (false, Guid.Empty, blocked);
+        }
+
         Webhook webhook;
 
         try
@@ -63,6 +72,8 @@ public sealed class WebhookService(
 
         return (true, webhook.Id, null);
     }
+
+    private static bool IsRetryable(int status) => status == 0 || status == 408 || status == 429 || status >= 500;
 
     private async Task<bool> VerifyHandshakeAsync(Webhook webhook, CancellationToken cancellationToken)
     {
@@ -92,6 +103,29 @@ public sealed class WebhookService(
         }
     }
 
+    /// <summary>Re-enables a webhook that auto-disabled itself after repeated failures.</summary>
+    public async Task<bool> SetEnabledAsync(
+        Guid webhookId,
+        bool enabled,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+
+        var webhook = await dbContext.Webhooks
+            .FirstOrDefaultAsync(row => row.Id == webhookId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (webhook is null)
+        {
+            return false;
+        }
+
+        webhook.SetEnabled(enabled);
+        await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        return true;
+    }
+
     /// <summary>Fire-and-record: a webhook failure never rolls back the write that triggered it.</summary>
     public async Task DispatchAsync(
         Guid boardId,
@@ -116,23 +150,70 @@ public sealed class WebhookService(
 
         foreach (var webhook in webhooks)
         {
-            try
+            // Re-checked here, not just at registration: DNS can be re-pointed afterwards.
+            if (await OutboundUrlPolicy.ValidateAsync(webhook.Url, cancellationToken).ConfigureAwait(false) is { } blocked)
             {
-                using var request = new HttpRequestMessage(HttpMethod.Post, webhook.Url)
-                {
-                    Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json")
-                };
-
-                request.Headers.Add("X-Tuesday-Signature", Webhook.Sign(webhook.Secret, body));
-                request.Headers.Add("X-Tuesday-Event", eventType);
-
-                using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
-                webhook.Record((int)response.StatusCode);
+                logger.LogWarning("Webhook {Id} blocked by URL policy: {Reason}", webhook.Id, blocked);
+                webhook.RecordFailure(0);
+                continue;
             }
-            catch (Exception exception)
+
+            var status = 0;
+            var delivered = false;
+
+            for (var attempt = 1; attempt <= MaxDeliveryAttempts && !delivered; attempt++)
             {
-                webhook.Record(0);
-                logger.LogWarning(exception, "Webhook dispatch to {Url} failed", webhook.Url);
+                try
+                {
+                    using var request = new HttpRequestMessage(HttpMethod.Post, webhook.Url)
+                    {
+                        Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json")
+                    };
+
+                    request.Headers.Add("X-Tuesday-Signature", Webhook.Sign(webhook.Secret, body));
+                    request.Headers.Add("X-Tuesday-Event", eventType);
+                    request.Headers.Add("X-Tuesday-Attempt", attempt.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+                    using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+                    status = (int)response.StatusCode;
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        webhook.RecordSuccess(status);
+                        delivered = true;
+                        break;
+                    }
+
+                    if (!IsRetryable(status))
+                    {
+                        break;
+                    }
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    status = 0;
+                    logger.LogInformation(exception, "Webhook attempt {Attempt} to {Url} failed", attempt, webhook.Url);
+                }
+
+                if (attempt < MaxDeliveryAttempts)
+                {
+                    // Short, bounded backoff: a dispatch runs inside the request that triggered
+                    // it, so it must not hold that request open for long.
+                    await Task.Delay(TimeSpan.FromMilliseconds(200 * attempt), cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            if (delivered)
+            {
+                continue;
+            }
+
+            if (webhook.RecordFailure(status))
+            {
+                logger.LogWarning(
+                    "Webhook {Id} disabled after {Failures} consecutive failed deliveries",
+                    webhook.Id,
+                    Webhook.DisableAfterFailures);
             }
         }
 

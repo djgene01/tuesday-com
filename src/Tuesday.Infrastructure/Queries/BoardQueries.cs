@@ -9,8 +9,71 @@ namespace Tuesday.Infrastructure.Queries;
 /// Read model for the grid. One round trip per board: columns, groups, items and cells,
 /// assembled in memory so the page does not issue a query per row.
 /// </summary>
+public sealed record ItemPage(IReadOnlyList<ItemView> Items, long? NextSeq, bool HasMore);
+
 public sealed class BoardQueries(IDbContextFactory<TuesdayDbContext> contextFactory)
 {
+    /// <summary>
+    /// Keyset page for the public API, ordered by the database sequence so a cursor stays
+    /// valid across reorders and inserts. <paramref name="afterSeq"/> is exclusive.
+    /// </summary>
+    public async Task<ItemPage> GetItemPageAsync(
+        Guid boardId,
+        long? afterSeq,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = await contextFactory
+            .CreateDbContextAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var query = dbContext.Items.AsNoTracking().Where(item => item.BoardId == boardId);
+
+        if (afterSeq is { } after)
+        {
+            query = query.Where(item => item.Seq > after);
+        }
+
+        // One extra row tells us whether another page exists without a count query.
+        var rows = await query
+            .OrderBy(item => item.Seq)
+            .Take(take + 1)
+            .Select(item => new { item.Id, item.Name, item.GroupId, item.ParentItemId, item.Seq })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var hasMore = rows.Count > take;
+        var page = hasMore ? rows.Take(take).ToList() : rows;
+        var ids = page.Select(row => row.Id).ToList();
+
+        var cells = ids.Count == 0
+            ? []
+            : await dbContext.ItemColumnValues.AsNoTracking()
+                .Where(cell => ids.Contains(cell.ItemId))
+                .Select(cell => new { cell.ItemId, cell.ColumnId, cell.TextValue, cell.NumberValue, cell.DateValue, cell.BoolValue })
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+        var byItem = cells
+            .GroupBy(cell => cell.ItemId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyDictionary<Guid, string?>)group.ToDictionary(
+                    cell => cell.ColumnId,
+                    cell => Display(cell.TextValue, cell.NumberValue, cell.DateValue, cell.BoolValue)));
+
+        var items = page
+            .Select(row => new ItemView(
+                row.Id,
+                row.Name,
+                byItem.TryGetValue(row.Id, out var map) ? map : new Dictionary<Guid, string?>(),
+                row.ParentItemId,
+                row.GroupId))
+            .ToList();
+
+        return new ItemPage(items, page.Count == 0 ? null : page[^1].Seq, hasMore);
+    }
+
     public async Task<BoardModel?> GetAsync(Guid boardId, CancellationToken cancellationToken = default)
     {
         await using var dbContext = await contextFactory

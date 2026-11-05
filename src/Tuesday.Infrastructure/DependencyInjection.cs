@@ -56,6 +56,8 @@ public static class DependencyInjection
         services.AddScoped<Tuesday.Infrastructure.Values.ColumnValueWriter>();
         services.AddScoped<Tuesday.Infrastructure.Boards.ItemEditor>();
         services.AddScoped<Tuesday.Infrastructure.Boards.SubitemColumnService>();
+        services.AddScoped<Tuesday.Infrastructure.Automations.IdempotencyService>();
+        services.AddScoped<Tuesday.Infrastructure.Automations.ApiQuotaService>();
         services.AddScoped<Tuesday.Infrastructure.Values.BoardColumnService>();
         services.AddScoped<Tuesday.Infrastructure.Views.ViewService>();
         services.AddScoped<Tuesday.Infrastructure.Views.DependencyService>();
@@ -71,7 +73,12 @@ public static class DependencyInjection
         services.AddScoped<Tuesday.Infrastructure.Collaboration.SearchService>();
         services.AddScoped<Tuesday.Infrastructure.Collaboration.AttachmentService>();
 
-        services.AddHttpClient("webhooks", client => client.Timeout = TimeSpan.FromSeconds(10));
+        services.AddHttpClient("webhooks", client => client.Timeout = TimeSpan.FromSeconds(10))
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                // A redirect could bounce a checked URL into the private network.
+                AllowAutoRedirect = false
+            });
         services.AddScoped<Tuesday.Infrastructure.Automations.AutomationService>();
         services.AddScoped<Tuesday.Infrastructure.Automations.WebhookService>();
         services.AddScoped<Tuesday.Infrastructure.Automations.ApiTokenService>();

@@ -34,6 +34,14 @@ public sealed class Webhook : ITenantOwned
 
     public int? LastStatus { get; private set; }
 
+    /// <summary>Failures since the last success; resets on any 2xx.</summary>
+    public int ConsecutiveFailures { get; private set; }
+
+    public DateTimeOffset? DisabledAt { get; private set; }
+
+    /// <summary>Delivery stops after this many consecutive failures, and the owner must re-enable.</summary>
+    public const int DisableAfterFailures = 20;
+
     public static Webhook Create(Guid tenantId, Guid boardId, string url, Guid createdBy)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || (uri.Scheme != "https" && uri.Scheme != "http"))
@@ -59,13 +67,47 @@ public sealed class Webhook : ITenantOwned
         return "sha256=" + Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(body))).ToLowerInvariant();
     }
 
-    public void Record(int status)
+    /// <summary>Records a delivered call. Any success clears the failure streak.</summary>
+    public void RecordSuccess(int status)
     {
         LastCalledAt = DateTimeOffset.UtcNow;
         LastStatus = status;
+        ConsecutiveFailures = 0;
     }
 
-    public void SetEnabled(bool enabled) => Enabled = enabled;
+    /// <summary>
+    /// Records a delivery that exhausted its retries. Returns true when this failure crossed
+    /// the threshold and disabled the webhook.
+    /// </summary>
+    public bool RecordFailure(int status)
+    {
+        LastCalledAt = DateTimeOffset.UtcNow;
+        LastStatus = status;
+        ConsecutiveFailures++;
+
+        if (ConsecutiveFailures < DisableAfterFailures)
+        {
+            return false;
+        }
+
+        Enabled = false;
+        DisabledAt = DateTimeOffset.UtcNow;
+        return true;
+    }
+
+    public void SetEnabled(bool enabled)
+    {
+        Enabled = enabled;
+
+        if (enabled)
+        {
+            DisabledAt = null;
+
+            // Re-enabling is an explicit decision, so the next failure streak starts from zero
+            // rather than instantly disabling again on a stale count.
+            ConsecutiveFailures = 0;
+        }
+    }
 }
 
 /// <summary>

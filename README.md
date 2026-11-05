@@ -177,6 +177,9 @@ assets are ours: a plain "T" mark, hand-written SVG icons, and open-licence font
 
 Tokens, component rules and the accessibility table live in **[docs/DESIGN.md](docs/DESIGN.md)**.
 
+The published API — auth, cursor pagination, idempotency, quotas and webhook delivery rules —
+is documented in **[docs/API.md](docs/API.md)**.
+
 ---
 
 ## Quick start
@@ -280,7 +283,7 @@ This is **0.9.0**, a release candidate. The honest limit list is in
 | Sub-items | ✅ inline expander, own column set with its own editor |
 | Drag reorder in the table grid | ⏳ planned |
 | Performance checkpoints | ✅ 5k: p95 136 ms · 100k: p95 1.77 s (`scripts/perf`) |
-| API pagination, idempotency keys, SSRF guard, webhook retries | ⏳ planned |
+| Cursor pagination, idempotency keys, SSRF guard, webhook retries | ✅ shipped |
 | Script/style CSP, SBOM, backup and restore rehearsal | ⏳ planned |
 
 ---

@@ -33,6 +33,8 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
 // operator error, and it should surface before the process reports healthy.
 builder.Services.AddInfrastructure(builder.Configuration);
 
+builder.Services.AddOpenApi();
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
@@ -401,6 +403,47 @@ static async Task<(Guid UserId, Guid TenantId, Tuesday.Domain.Tenancy.TenantRole
             : Tuesday.Domain.Tenancy.TenantRole.Member);
 }
 
+// Per-token daily budget for the public API. Runs before the endpoints so a refused call
+// costs nothing beyond the counter increment.
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path;
+
+    if (!path.StartsWithSegments("/api/v1"))
+    {
+        await next(context);
+        return;
+    }
+
+    var authorization = context.Request.Headers.Authorization.ToString();
+
+    if (authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+    {
+        var quota = context.RequestServices.GetRequiredService<Tuesday.Infrastructure.Automations.ApiQuotaService>();
+        var tokenHash = Tuesday.Domain.Automation.ApiToken.HashOf(authorization["Bearer ".Length..].Trim());
+        var decision = await quota.ConsumeAsync(tokenHash, context.RequestAborted);
+
+        context.Response.Headers["X-RateLimit-Limit"] = quota.DailyLimit.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        context.Response.Headers["X-RateLimit-Remaining"] = decision.Remaining.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        if (!decision.Allowed)
+        {
+            context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+            context.Response.Headers.RetryAfter = decision.RetryAfterSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            await context.Response.WriteAsJsonAsync(new
+            {
+                error = "The daily API quota for this token is exhausted.",
+                retry_in_seconds = decision.RetryAfterSeconds
+            });
+            return;
+        }
+    }
+
+    await next(context);
+});
+
+app.MapOpenApi();
+
 app.MapGet("/api/v1/boards", async (
     HttpContext http,
     Tuesday.Infrastructure.Automations.ApiTokenService tokens,
@@ -436,6 +479,7 @@ app.MapGet("/api/v1/boards/{boardId:guid}/items", async (
     Guid boardId,
     HttpContext http,
     int? take,
+    string? cursor,
     Tuesday.Infrastructure.Automations.ApiTokenService tokens,
     Tuesday.Application.Tenancy.ITenantContext tenant,
     Tuesday.Infrastructure.Queries.WorkspaceQueries boards,
@@ -457,30 +501,34 @@ app.MapGet("/api/v1/boards/{boardId:guid}/items", async (
         return Results.NotFound();
     }
 
-    var board = await queries.GetAsync(boardId, cancellationToken);
+    long? afterSeq = null;
 
-    if (board is null)
+    if (!string.IsNullOrWhiteSpace(cursor))
     {
-        return Results.NotFound();
+        if (!Tuesday.Application.Boards.PageCursor.TryDecode(cursor, out var seq))
+        {
+            return Results.BadRequest(new { error = "The cursor is not valid." });
+        }
+
+        afterSeq = seq;
     }
 
     var limit = Math.Clamp(take ?? 50, 1, 500);
+    var page = await queries.GetItemPageAsync(boardId, afterSeq, limit, cancellationToken);
 
     return Results.Ok(new
     {
-        board = new { id = board.Id, name = board.Name },
-        columns = board.Columns.Select(column => new { id = column.Id, title = column.Title, type = column.Type.ToString() }),
-        items = board.Groups
-            .SelectMany(group => group.Items)
-            .Take(limit)
-            .Select(item => new
-            {
-                id = item.Id,
-                name = item.Name,
-                values = item.Cells.ToDictionary(
-                    cell => cell.Key.ToString("D"),
-                    cell => cell.Value)
-            })
+        boardId,
+        items = page.Items.Select(item => new
+        {
+            id = item.Id,
+            name = item.Name,
+            groupId = item.GroupId,
+            parentId = item.ParentId,
+            values = item.Cells.ToDictionary(cell => cell.Key.ToString("D"), cell => cell.Value)
+        }),
+        nextCursor = page.HasMore && page.NextSeq is { } next ? Tuesday.Application.Boards.PageCursor.Encode(next) : null,
+        hasMore = page.HasMore
     });
 }).RequireRateLimiting("api");
 
@@ -492,6 +540,7 @@ app.MapPost("/api/v1/boards/{boardId:guid}/items/{itemId:guid}/updates", async (
     Tuesday.Application.Tenancy.ITenantContext tenant,
     Tuesday.Infrastructure.Queries.WorkspaceQueries boards,
     Tuesday.Infrastructure.Collaboration.UpdateService updates,
+    Tuesday.Infrastructure.Automations.IdempotencyService idempotency,
     Tuesday.Web.Api.UpdateRequest request,
     CancellationToken cancellationToken) =>
 {
@@ -510,11 +559,55 @@ app.MapPost("/api/v1/boards/{boardId:guid}/items/{itemId:guid}/updates", async (
         return Results.NotFound();
     }
 
+    const string endpoint = "POST /api/v1/boards/{boardId}/items/{itemId}/updates";
+    var key = http.Request.Headers["Idempotency-Key"].ToString();
+
+    if (key.Length > 200)
+    {
+        return Results.BadRequest(new { error = "Idempotency-Key must be 200 characters or fewer." });
+    }
+
+    var requestHash = Tuesday.Infrastructure.Automations.IdempotencyService.HashOf(
+        System.Text.Json.JsonSerializer.Serialize(request));
+
+    if (!string.IsNullOrWhiteSpace(key))
+    {
+        var outcome = await idempotency.BeginAsync(tenantId, userId, key, endpoint, requestHash, cancellationToken);
+
+        if (outcome.State == Tuesday.Infrastructure.Automations.IdempotencyState.Conflict)
+        {
+            return Results.Conflict(new
+            {
+                error = "This Idempotency-Key was already used for a different request body."
+            });
+        }
+
+        if (outcome.State == Tuesday.Infrastructure.Automations.IdempotencyState.Replay)
+        {
+            http.Response.Headers["Idempotent-Replayed"] = "true";
+            return Results.Content(
+                outcome.ResponseJson ?? "{}",
+                "application/json",
+                statusCode: outcome.StatusCode);
+        }
+    }
+
     var result = await updates.PostAsync(boardId, itemId, userId, request.Body, cancellationToken);
 
-    return result.Succeeded
-        ? Results.Created($"/api/v1/updates/{result.Id:D}", new { id = result.Id })
-        : Results.BadRequest(new { error = result.Error });
+    if (!result.Succeeded)
+    {
+        return Results.BadRequest(new { error = result.Error });
+    }
+
+    var body = System.Text.Json.JsonSerializer.Serialize(new { id = result.Id });
+
+    if (!string.IsNullOrWhiteSpace(key))
+    {
+        await idempotency.CompleteAsync(
+            tenantId, userId, key, endpoint, requestHash, StatusCodes.Status201Created, body, cancellationToken);
+    }
+
+    return Results.Created($"/api/v1/updates/{result.Id:D}", new { id = result.Id });
 }).RequireRateLimiting("api");
 
 app.MapPost("/api/v1/boards/{boardId:guid}/webhooks", async (
@@ -570,6 +663,35 @@ app.MapPost("/api/v1/boards/{boardId:guid}/webhooks/test", async (
     await hooks.DispatchAsync(boardId, "webhook.test", new { hello = "world" }, cancellationToken);
 
     return Results.Ok(new { dispatched = true });
+}).RequireRateLimiting("api");
+
+app.MapPost("/api/v1/webhooks/{webhookId:guid}/enable", async (
+    Guid webhookId,
+    HttpContext http,
+    Tuesday.Infrastructure.Automations.ApiTokenService tokens,
+    Tuesday.Application.Tenancy.ITenantContext tenant,
+    Tuesday.Infrastructure.Automations.WebhookService hooks,
+    CancellationToken cancellationToken) =>
+{
+    var identity = await CallerAsync(http, tokens, cancellationToken);
+
+    if (identity is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var (userId, tenantId, role) = identity.Value;
+
+    if (role != Tuesday.Domain.Tenancy.TenantRole.Admin)
+    {
+        return Results.Forbid();
+    }
+
+    ((Tuesday.Application.Tenancy.ITenantContextSetter)tenant).Resolve(tenantId, userId, role);
+
+    return await hooks.SetEnabledAsync(webhookId, true, cancellationToken)
+        ? Results.Ok(new { enabled = true })
+        : Results.NotFound();
 }).RequireRateLimiting("api");
 
 app.MapGet("/attachments/{id:guid}", async (

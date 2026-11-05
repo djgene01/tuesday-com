@@ -45,6 +45,8 @@ public sealed class TuesdayDbContext(
 
     public DbSet<SubitemBoard> SubitemBoards => Set<SubitemBoard>();
 
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+
     public DbSet<ItemColumnValue> ItemColumnValues => Set<ItemColumnValue>();
 
     public DbSet<BoardView> BoardViews => Set<BoardView>();
@@ -209,12 +211,26 @@ public sealed class TuesdayDbContext(
             entity.ToTable("items");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Name).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.Seq).UseIdentityByDefaultColumn();
+            entity.HasIndex(x => new { x.BoardId, x.Seq }).IsUnique();
             entity.HasIndex(x => new { x.BoardId, x.Position });
             entity.HasIndex(x => new { x.GroupId, x.Position });
 
             // Sub-items are read per parent when the grid expands a row, and the parent must
             // live on the same board — enforced by the index, filtered by the query.
             entity.HasIndex(x => new { x.ParentItemId, x.Position });
+        });
+
+        builder.Entity<IdempotencyRecord>(entity =>
+        {
+            entity.ToTable("idempotency_keys");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Key).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Endpoint).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.RequestHash).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.ResponseJson).IsRequired();
+            entity.HasIndex(x => new { x.UserId, x.Key }).IsUnique();
+            entity.HasIndex(x => x.ExpiresAt);
         });
 
         builder.Entity<SubitemBoard>(entity =>

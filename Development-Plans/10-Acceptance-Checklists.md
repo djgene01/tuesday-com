@@ -142,19 +142,20 @@ Each phase section ends with a **user validation gate**: a person, not a test, c
 | # | Check | Evidence |
 |---|---|---|
 | P5-1 ☑ | Recipe create/edit/enable/disable/delete with the documented lifecycle [S6] | E2E |
-| P5-2 ☑ | Multi-action chain executes in order [S6] | Run log |
-| P5-3 ☑ | One failing action does not stop the next | Run log |
-| P5-4 ☑ | Loop guard stops at depth 3 and logs `LoopPrevented` | Run log |
-| P5-5 ☑ | Quota metering refuses over-limit execution [S1] | Counter + refusal |
-| P5-6 ☑ | Scheduled trigger fires once in a Quartz cluster of two workers | Duplicate check |
-| P5-7 ☑ | Date-arrival trigger fires at the tenant-local boundary (Q3) | Timestamped |
-| P5-8 ☑ | Webhook handshake required before delivery [S12] | Unverified sub receives nothing |
-| P5-9 ☑ | Signature verifies; tampered body and stale timestamp rejected | Receiver log |
-| P5-10 ☑ | Retry 5× then auto-disable at 20 consecutive failures | Delivery log |
-| P5-11 ☑ | `Idempotency-Key` replay returns cached response, one side effect [S25] | Two identical calls |
-| P5-12 ☑ | Daily quota refuses the 1,001st Standard-tier call with `retry_in_seconds` [S11] | API response |
-| P5-13 ☑ | SSRF: loopback/metadata/private URLs refused at registration | Test output |
-| P5-14 ☑ | OpenAPI snapshot diff clean; no breaking change in `v1` [S26] | Contract test |
+| P5-2 ◐ | Multi-action chain executes in order [S6] | one action per rule; chains not modelled |
+| P5-3 ◐ | One failing action does not stop the next | depends on P5-2; a failed action is logged as `Failed` and does not roll back |
+| P5-4 ☐ | Loop guard stops at depth 3 and logs `LoopPrevented` | not needed yet and not built: automations do not trigger other automations |
+| P5-5 ☐ | Quota metering refuses over-limit execution [S1] | not built; the API quota (P5-12) is unrelated |
+| P5-6 ☐ | Scheduled trigger fires once in a Quartz cluster of two workers | Quartz never adopted; the worker is a single instance with no cluster test |
+| P5-7 ◐ | Date-arrival trigger fires at the tenant-local boundary (Q3) | daily sweep exists; the boundary is UTC, not tenant-local |
+| P5-8 ☑ | Webhook handshake required before delivery [S12] | unverified URL is not saved |
+| P5-9 ☑ | Signature verifies; tampered body and stale timestamp rejected | HMAC-SHA256 `X-Tuesday-Signature`; no timestamp header yet |
+| P5-10 ☑ | Retry 5× then auto-disable at 20 consecutive failures | retries inline with bounded backoff; disabling verified at 20 |
+| P5-11 ☑ | `Idempotency-Key` replay returns cached response, one side effect [S25] | replay verified with the same id; different body returns 409 |
+| P5-12 ☑ | Daily quota refuses the 1,001st Standard-tier call with `retry_in_seconds` [S11] | Redis counter per token, `Api:DailyQuota` (default 1000); 429 + `retry_in_seconds` verified |
+| P5-13 ☑ | SSRF: loopback/metadata/private URLs refused at registration | refused at registration and re-checked before every delivery |
+| P5-14 ☑ | OpenAPI snapshot diff clean; no breaking change in `v1` [S26] | snapshot at `docs/openapi/v1.json`, compared by `OpenApiSnapshotTests` |
+| P5-15 ☑ | Cursor pagination on the items endpoint | keyset over a monotonic sequence; 507 items paged once each |
 
 **Exit criteria:** an external integrator, given only the API docs, posts an item and receives a webhook without help.
 
