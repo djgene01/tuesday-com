@@ -43,6 +43,8 @@ public sealed class TuesdayDbContext(
 
     public DbSet<Item> Items => Set<Item>();
 
+    public DbSet<SubitemBoard> SubitemBoards => Set<SubitemBoard>();
+
     public DbSet<ItemColumnValue> ItemColumnValues => Set<ItemColumnValue>();
 
     public DbSet<BoardView> BoardViews => Set<BoardView>();
@@ -213,6 +215,16 @@ public sealed class TuesdayDbContext(
             // Sub-items are read per parent when the grid expands a row, and the parent must
             // live on the same board — enforced by the index, filtered by the query.
             entity.HasIndex(x => new { x.ParentItemId, x.Position });
+        });
+
+        builder.Entity<SubitemBoard>(entity =>
+        {
+            entity.ToTable("subitem_boards");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Title).HasMaxLength(200).IsRequired();
+
+            // One implicit sub-item surface per parent board.
+            entity.HasIndex(x => x.BoardId).IsUnique();
         });
 
         builder.Entity<ItemColumnValue>(entity =>

@@ -35,6 +35,29 @@ public sealed class BoardQueries(IDbContextFactory<TuesdayDbContext> contextFact
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+        // The sub-item surface owns its own column set; it is created lazily by the editor
+        // and copied from the parent board on demand, never kept in sync afterwards.
+        var subitemBoardId = await dbContext.SubitemBoards.AsNoTracking()
+            .Where(candidate => candidate.BoardId == boardId)
+            .Select(candidate => (Guid?)candidate.Id)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var subitemColumns = new List<ColumnView>();
+
+        if (subitemBoardId is { } subitemId)
+        {
+            var rows = await dbContext.BoardColumns.AsNoTracking()
+                .Where(column => column.BoardId == subitemId)
+                .OrderBy(column => column.Position)
+                .Select(column => new { column.Id, column.Title, column.Type, column.SettingsJson })
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            subitemColumns.AddRange(rows.Select(column =>
+                new ColumnView(column.Id, column.Title, column.Type, column.SettingsJson)));
+        }
+
         var groups = await dbContext.ItemGroups.AsNoTracking()
             .Where(group => group.BoardId == boardId)
             .OrderBy(group => group.Position)
@@ -108,7 +131,12 @@ public sealed class BoardQueries(IDbContextFactory<TuesdayDbContext> contextFact
                     .ToList()))
             .ToList();
 
-        return new BoardModel(board.Id, board.Name, columnViews, groupViews);
+        var model = new BoardModel(board.Id, board.Name, columnViews, groupViews)
+        {
+            SubItemColumns = subitemColumns
+        };
+
+        return model;
 
         IReadOnlyDictionary<Guid, string?> Cells(Guid itemId) =>
             byItem.TryGetValue(itemId, out var map) ? map : new Dictionary<Guid, string?>();

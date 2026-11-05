@@ -1,4 +1,5 @@
 using Tuesday.Application.Boards;
+using Tuesday.Domain.Boards;
 using Tuesday.Domain.Items;
 
 namespace Tuesday.Tests.Unit;
@@ -65,6 +66,39 @@ public sealed class ItemHierarchyTests
         var item = Item.Create(Tenant, Board, Group, "Task 001", 0);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => item.MoveTo(Group, -1));
+    }
+
+    [Fact]
+    public void A_subitem_board_defaults_its_title_and_needs_a_parent_board()
+    {
+        var board = SubitemBoard.Create(Tenant, Board);
+
+        Assert.Equal("Subitems", board.Title);
+        Assert.Equal(Board, board.BoardId);
+        Assert.NotEqual(Guid.Empty, board.Id);
+
+        Assert.Throws<ArgumentException>(() => SubitemBoard.Create(Tenant, Guid.Empty));
+    }
+
+    [Fact]
+    public void Sub_item_columns_are_separate_from_the_parent_columns()
+    {
+        var parentColumn = Guid.CreateVersion7();
+        var subColumn = Guid.CreateVersion7();
+
+        var board = new BoardModel(
+            Board,
+            "Campaign calendar",
+            [new ColumnView(parentColumn, "Status", ColumnType.Status, null)],
+            [])
+        {
+            SubItemColumns = [new ColumnView(subColumn, "Status", ColumnType.Status, null)]
+        };
+
+        Assert.True(board.HasSubItemColumns);
+        Assert.Equal(parentColumn, board.ColumnOfType(ColumnType.Status)!.Id);
+        Assert.Equal(subColumn, board.SubItemColumnOfType(ColumnType.Status)!.Id);
+        Assert.Equal(subColumn, board.Column(subColumn)!.Id);
     }
 
     [Fact]

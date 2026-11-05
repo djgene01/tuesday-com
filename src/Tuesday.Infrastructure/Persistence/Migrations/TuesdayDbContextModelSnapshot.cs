@@ -677,6 +677,34 @@ namespace Tuesday.Infrastructure.Persistence.Migrations
                     b.ToTable("item_groups", (string)null);
                 });
 
+            modelBuilder.Entity("Tuesday.Domain.Boards.SubitemBoard", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BoardId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BoardId")
+                        .IsUnique();
+
+                    b.ToTable("subitem_boards", (string)null);
+                });
+
             modelBuilder.Entity("Tuesday.Domain.Collaboration.Attachment", b =>
                 {
                     b.Property<Guid>("Id")

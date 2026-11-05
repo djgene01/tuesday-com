@@ -27,6 +27,14 @@ public sealed record BoardModel(
     IReadOnlyList<ColumnView> Columns,
     IReadOnlyList<GroupView> Groups)
 {
+    /// <summary>
+    /// The sub-item board's own columns. Empty until they are copied from the parent board,
+    /// and never kept in sync with it afterwards.
+    /// </summary>
+    public IReadOnlyList<ColumnView> SubItemColumns { get; init; } = [];
+
+    public bool HasSubItemColumns => SubItemColumns.Count > 0;
+
     public int ItemCount => Groups.Sum(group => group.Items.Count);
 
     /// <summary>Every sub-item on the board, across groups.</summary>
@@ -37,9 +45,14 @@ public sealed record BoardModel(
 
     public IEnumerable<ItemView> AllItems => Items.SelectMany(item => item.SubItems.Prepend(item));
 
-    public ColumnView? Column(Guid columnId) => Columns.FirstOrDefault(column => column.Id == columnId);
+    public ColumnView? Column(Guid columnId) =>
+        Columns.FirstOrDefault(column => column.Id == columnId)
+        ?? SubItemColumns.FirstOrDefault(column => column.Id == columnId);
 
     public ColumnView? ColumnOfType(ColumnType type) => Columns.FirstOrDefault(column => column.Type == type);
+
+    public ColumnView? SubItemColumnOfType(ColumnType type) =>
+        SubItemColumns.FirstOrDefault(column => column.Type == type);
 }
 
 /// <summary>

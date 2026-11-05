@@ -109,6 +109,20 @@ public sealed class DevelopmentSeeder(
 
         dbContext.BoardColumns.AddRange(columns);
 
+        // The sub-item surface starts with its own columns, independent of the parent's.
+        var subitemBoard = SubitemBoard.Create(tenant.Id, board.Id);
+        dbContext.SubitemBoards.Add(subitemBoard);
+
+        var subitemColumns = new[]
+        {
+            BoardColumn.Create(tenant.Id, subitemBoard.Id, "owner", "Owner", ColumnType.People, 0),
+            BoardColumn.Create(tenant.Id, subitemBoard.Id, "status", "Status", ColumnType.Status, 1,
+                """{"labels":["Not started","Working on it","Stuck","Done"]}"""),
+            BoardColumn.Create(tenant.Id, subitemBoard.Id, "due", "Due date", ColumnType.Date, 2)
+        };
+
+        dbContext.BoardColumns.AddRange(subitemColumns);
+
         // Views are projections, so seeding four of them adds no item data at all.
         dbContext.BoardViews.AddRange(
             BoardView.Create(tenant.Id, board.Id, "Main table", ViewType.Grid, 0),
@@ -187,8 +201,8 @@ public sealed class DevelopmentSeeder(
                 dbContext.Items.Add(child);
 
                 dbContext.ItemColumnValues.AddRange(
-                    Cell(dbContext, tenant, child, columns[1], people[sub % people.Count].Id.ToString(), text: people[sub % people.Count].DisplayName),
-                    Cell(dbContext, tenant, child, columns[2], statuses[(index + sub) % statuses.Length], text: statuses[(index + sub) % statuses.Length]));
+                    Cell(dbContext, tenant, child, subitemColumns[0], people[sub % people.Count].Id.ToString(), text: people[sub % people.Count].DisplayName),
+                    Cell(dbContext, tenant, child, subitemColumns[1], statuses[(index + sub) % statuses.Length], text: statuses[(index + sub) % statuses.Length]));
             }
         }
 

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Tuesday.Application.Boards;
 using Tuesday.Application.Tenancy;
+using Tuesday.Domain.Boards;
 using Tuesday.Domain.Items;
 using Tuesday.Infrastructure.Persistence;
 
@@ -67,6 +68,8 @@ public sealed class ItemEditor(
 
             // A sub-item inherits its parent's group so the two cannot drift apart.
             groupId = parent.GroupId;
+
+            await EnsureSubitemBoardAsync(dbContext, tenantId, boardId, cancellationToken).ConfigureAwait(false);
         }
 
         var lastPosition = await dbContext.Items
@@ -87,6 +90,97 @@ public sealed class ItemEditor(
         await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         return ItemWriteResult.Ok(item.Id, item.Position);
+    }
+
+    /// <summary>
+    /// Copies the parent board's item columns into the sub-item board.
+    ///
+    /// This is a one-way copy by design: a later rename, retype or delete on the parent board
+    /// does not propagate, and a sub-item column can be changed without touching the parent.
+    /// Running it twice only adds columns whose key is missing.
+    /// </summary>
+    public async Task<ItemWriteResult> CopyParentColumnsAsync(
+        Guid boardId,
+        CancellationToken cancellationToken = default)
+    {
+        if (tenant.TenantId is not { } tenantId)
+        {
+            return ItemWriteResult.Fail("No tenant is bound to this request.");
+        }
+
+        await using var dbContext = await contextFactory
+            .CreateDbContextAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var subitemBoardId = await EnsureSubitemBoardAsync(dbContext, tenantId, boardId, cancellationToken)
+            .ConfigureAwait(false);
+
+        var parentColumns = await dbContext.BoardColumns.AsNoTracking()
+            .Where(column => column.BoardId == boardId)
+            .OrderBy(column => column.Position)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var existingKeys = await dbContext.BoardColumns.AsNoTracking()
+            .Where(column => column.BoardId == subitemBoardId)
+            .Select(column => column.Key)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var existing = existingKeys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var position = existingKeys.Count;
+        var copied = 0;
+
+        foreach (var column in parentColumns)
+        {
+            if (!existing.Add(column.Key))
+            {
+                continue;
+            }
+
+            dbContext.BoardColumns.Add(BoardColumn.Create(
+                tenantId,
+                subitemBoardId,
+                column.Key,
+                column.Title,
+                column.Type,
+                position++,
+                column.SettingsJson));
+
+            copied++;
+        }
+
+        if (copied > 0)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        return ItemWriteResult.Ok(subitemBoardId, copied);
+    }
+
+    /// <summary>Returns the sub-item board's id, creating it the first time it is needed.</summary>
+    private static async Task<Guid> EnsureSubitemBoardAsync(
+        TuesdayDbContext dbContext,
+        Guid tenantId,
+        Guid boardId,
+        CancellationToken cancellationToken)
+    {
+        var existing = await dbContext.SubitemBoards
+            .Where(candidate => candidate.BoardId == boardId)
+            .Select(candidate => (Guid?)candidate.Id)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (existing is { } id)
+        {
+            return id;
+        }
+
+        var created = SubitemBoard.Create(tenantId, boardId);
+        dbContext.SubitemBoards.Add(created);
+        await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        return created.Id;
     }
 
     /// <summary>
