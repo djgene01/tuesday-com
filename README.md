@@ -279,7 +279,7 @@ This is **0.9.0**, a release candidate. The honest limit list is in
 | Dashboard, health, logging, security headers, container | ✅ shipped |
 | Subitems | ⏳ planned |
 | Drag reorder in the table grid | ⏳ planned |
-| 100k-item and 5k-item performance checkpoints | ⏳ not yet measured |
+| Performance checkpoints | ✅ 5k: p95 136 ms · 100k: p95 1.77 s (`scripts/perf`) |
 | API pagination, idempotency keys, SSRF guard, webhook retries | ⏳ planned |
 | Script/style CSP, SBOM, backup and restore rehearsal | ⏳ planned |
 

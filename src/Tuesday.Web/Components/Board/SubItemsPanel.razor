@@ -1,0 +1,123 @@
+@using Tuesday.Application.Boards
+@using Tuesday.Infrastructure.Boards
+@using Tuesday.Infrastructure.Queries
+@using Tuesday.Web.Security
+@inject BoardQueries Queries
+@inject ItemEditor Editor
+@inject TenantContextBootstrapper Bootstrapper
+
+@*
+    Sub-items live in their own interactive island because the item page itself is static
+    SSR: a button with @onclick there would render and then do nothing.
+*@
+
+<section class="ui-card mt-4 overflow-hidden" aria-label="Sub-items">
+    <header class="flex items-center gap-3 border-b border-line px-4 py-3">
+        <h2 class="font-display text-[15px] font-semibold text-ink">Sub-items</h2>
+        <span class="text-xs text-ink-faint">@(_parent?.SubItems.Count ?? 0)</span>
+    </header>
+
+    @if (_error is not null)
+    {
+        <p class="border-b border-line bg-status-stuck/10 px-4 py-2 text-sm text-status-stuck" role="alert">@_error</p>
+    }
+
+    @if (_parent is null)
+    {
+        <p class="px-4 py-4 text-sm text-ink-faint">Loading…</p>
+    }
+    else if (_parent.SubItems.Count > 0)
+    {
+        <ul class="divide-y divide-line">
+            @foreach (var sub in _parent.SubItems)
+            {
+                <li class="flex items-center gap-3 px-4 py-2">
+                    <span class="text-ink-faint" aria-hidden="true">└</span>
+                    <a class="text-[13px] font-medium text-ink no-underline hover:text-brand hover:underline"
+                       href="@($"/board/{BoardId}/item/{sub.Id}")">@sub.Name</a>
+                </li>
+            }
+        </ul>
+    }
+    else
+    {
+        <p class="px-4 py-4 text-sm text-ink-soft">No sub-items yet.</p>
+    }
+
+    @if (CanEdit)
+    {
+        <div class="border-t border-line px-4 py-3">
+            <label class="block">
+                <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Add a sub-item</span>
+                <input type="text" @bind="_name" @bind:event="oninput" placeholder="Sub-item name"
+                       aria-label="Add a sub-item"
+                       class="h-9 w-full rounded-control border border-line-strong bg-surface px-3 text-sm text-ink outline-none transition placeholder:text-ink-faint focus:border-brand focus:ring-2 focus:ring-brand/20" />
+            </label>
+            <div class="mt-2 flex items-center gap-3">
+                <p class="text-[11px] text-ink-faint">Sub-items inherit this item's group and can be reordered in the grid.</p>
+                <button type="button" class="ui-btn-primary ml-auto !h-8 !px-3 text-[13px] disabled:opacity-50"
+                        disabled="@(string.IsNullOrWhiteSpace(_name) || _busy)"
+                        @onclick="AddAsync">
+                    @(_busy ? "Adding…" : "Add")
+                </button>
+            </div>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public Guid BoardId { get; set; }
+
+    [Parameter, EditorRequired]
+    public Guid ItemId { get; set; }
+
+    [Parameter]
+    public bool CanEdit { get; set; }
+
+    private ItemView? _parent;
+    private string _name = string.Empty;
+    private string? _error;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Bootstrapper.EnsureResolvedAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var board = await Queries.GetAsync(BoardId);
+        _parent = board?.Items.FirstOrDefault(item => item.Id == ItemId);
+    }
+
+    private async Task AddAsync()
+    {
+        if (_parent is null || _busy)
+        {
+            return;
+        }
+
+        _busy = true;
+
+        try
+        {
+            var result = await Editor.AddAsync(BoardId, _parent.GroupId, _name, _parent.Id);
+
+            if (!result.Succeeded)
+            {
+                _error = result.Error;
+                return;
+            }
+
+            _error = null;
+            _name = string.Empty;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

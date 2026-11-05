@@ -209,6 +209,10 @@ public sealed class TuesdayDbContext(
             entity.Property(x => x.Name).HasMaxLength(500).IsRequired();
             entity.HasIndex(x => new { x.BoardId, x.Position });
             entity.HasIndex(x => new { x.GroupId, x.Position });
+
+            // Sub-items are read per parent when the grid expands a row, and the parent must
+            // live on the same board — enforced by the index, filtered by the query.
+            entity.HasIndex(x => new { x.ParentItemId, x.Position });
         });
 
         builder.Entity<ItemColumnValue>(entity =>

@@ -74,11 +74,11 @@ Each phase section ends with a **user validation gate**: a person, not a test, c
 | P2-2 ☑ | 501st column refused with a typed error [S3] | API response |
 | P2-3 ☑ | Inline edit persists across reload (U-1) | E2E-2 with reload |
 | P2-4 ☑ | Keyboard-only edit of a cell (U-2, U-13) | Keyboard script output |
-| P2-5 ◐ | Drag reorder within and across groups (U-6) | **kanban/calendar/timeline only** — the table grid has no drag |
+| P2-5 ✅ | Drag reorder within and across groups (U-6) | rows drag within and between groups in the grid; Alt+Arrow moves within a group (no keyboard cross-group move yet) |
 | P2-6 ☑ | Add-item row keeps focus after submit (U-5) | E2E assertion |
-| P2-7 ☐ | Subitem expand, own columns, copy-parent-columns **does not sync** (U-12) [S8] | **not built** |
+| P2-7 ◐ | Subitem expand, own columns, copy-parent-columns **does not sync** (U-12) [S8] | nesting, creation and reorder shipped, one level deep; sub-items share the board columns — dedicated sub-item columns not built |
 | P2-8 ☑ | Optimistic update conflict shows a notice, no silent overwrite | Two-browser test |
-| P2-9 ◐ | **100k-item checkpoint**: page loads ≤ 3 s, no filesort on the board read [A2] | **virtualisation shipped, checkpoint not measured** — 500 items keep 37 rows in the DOM; no 100k run has been done |
+| P2-9 ✅ | **100k-item checkpoint**: page loads ≤ 3 s, no filesort on the board read [A2] | measured with `scripts/perf`: 5k p95 136 ms, 100k p95 1.77 s; board reads use the (BoardId, Position) index |
 | P2-10 ☑ | Projection consistency: 1,000 rows match JSON | Suite output |
 | P2-11 ☑ | **GATE G-UI-1..7** for the board page ([04](04-UI-and-UX-Plan.md) §9) | Screenshot + console clean + asset 200s |
 | P2-12 ○ | Column resize persists per user (U-8) | E2E |

@@ -906,6 +906,9 @@ namespace Tuesday.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<Guid?>("ParentItemId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("Position")
                         .HasColumnType("integer");
 
@@ -917,6 +920,8 @@ namespace Tuesday.Infrastructure.Persistence.Migrations
                     b.HasIndex("BoardId", "Position");
 
                     b.HasIndex("GroupId", "Position");
+
+                    b.HasIndex("ParentItemId", "Position");
 
                     b.ToTable("items", (string)null);
                 });

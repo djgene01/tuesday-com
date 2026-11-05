@@ -23,7 +23,7 @@ API — and deliberately unproven on operational load. Read "Known limitations" 
 | Dashboard | Per-board counts, by-status and by-group breakdown, automation run history |
 | Ops | `/health/live`, `/health/ready`, correlation ids, security headers, Docker image, Compose stack |
 
-**Verification at this tag:** 103 tests green (52 unit, 38 isolation, 13 integration), Release build
+**Verification at this tag:** 110 tests green (59 unit, 38 isolation, 13 integration), Release build
 with zero warnings, container healthy in Production behind the deployment path in
 `docs/runbooks/signing-certificate.md`.
 
@@ -34,12 +34,14 @@ with zero warnings, container healthy in Production behind the deployment path i
 Stated plainly because they are real. Each maps to an open item in
 `Development-Plans/10-Acceptance-Checklists.md` §8.
 
-1. **The item grid is virtualised**, so a 500-item board keeps ~37 rows in the DOM and scrolls
-   smoothly. The 100k-item checkpoint has still not been run, so treat "large" as unmeasured
-   beyond a few thousand.
-2. **No subitems.** Specified (U-12), not built.
-3. **Drag reordering is not available in the grid.** Kanban, calendar and timeline are
-   drag-enabled; the table grid is not.
+1. **The item grid is virtualised.** A 500-item board keeps ~37 rows in the DOM. Measured on
+   this hardware against the fixture scripts in `scripts/perf`: 5,000 items give p50 105 ms /
+   p95 136 ms for the full page render; a 100,000-item board gives p50 1.72 s / p95 1.77 s.
+   The 100k figure is a single-user render checkpoint, not a concurrent-load result.
+2. **Sub-items are one level deep.** A sub-item cannot have its own sub-items, and moving one
+   to another group is refused, because it would contradict its parent's group.
+3. **Grid drag is pointer-only for cross-group moves.** Alt+Arrow moves a row within its
+   group and is the keyboard path; dragging across groups has no keyboard equivalent yet.
 4. **No load test has been run.** The 200-user / 5,000-item targets in
    `01-Requirements.md` §4 are **unmeasured**, not met.
 5. **Single web instance only.** No second replica, no Redis backplane for SignalR, no affinity

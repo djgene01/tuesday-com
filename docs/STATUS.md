@@ -130,7 +130,8 @@ not pretended:
   writer (canonical JSON plus typed projections), inline cell editing over Interactive Server,
   Tab/Enter/Escape keyboard handling, 500-column limit with a typed error, 500-item seed board.
 - **Not yet:** row virtualisation, drag reorder within and across groups, subitems, the
-  100k-item load probe, and the p95 1.5 s checkpoint at 5,000 items (500 items render in
+  the 100k-item probe, and the p95 checkpoint at 5,000 items (measured: p95 136 ms at 5,000,
+  p95 1.77 s at 100,000; 500 items render in
   ~0.4 s server-side, which is not the same measurement).
 
 

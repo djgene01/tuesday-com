@@ -4,7 +4,16 @@ namespace Tuesday.Application.Boards;
 
 public sealed record ColumnView(Guid Id, string Title, ColumnType Type, string? SettingsJson);
 
-public sealed record ItemView(Guid Id, string Name, IReadOnlyDictionary<Guid, string?> Cells);
+/// <summary>
+/// One row. <see cref="ParentId"/> is set for a sub-item, and <see cref="SubItems"/> carries
+/// the children of a top-level item so the grid can nest without a second query.
+/// </summary>
+public sealed record ItemView(Guid Id, string Name, IReadOnlyDictionary<Guid, string?> Cells, Guid? ParentId = null, Guid GroupId = default)
+{
+    public IReadOnlyList<ItemView> SubItems { get; init; } = [];
+
+    public int SubItemCount => SubItems.Count;
+}
 
 public sealed record GroupView(Guid Id, string Title, string Colour, IReadOnlyList<ItemView> Items);
 
@@ -20,7 +29,13 @@ public sealed record BoardModel(
 {
     public int ItemCount => Groups.Sum(group => group.Items.Count);
 
+    /// <summary>Every sub-item on the board, across groups.</summary>
+    public int SubItemCount => Groups.Sum(group => group.Items.Sum(item => item.SubItems.Count));
+
+    /// <summary>Top-level items only; sub-items are reached through their parent.</summary>
     public IEnumerable<ItemView> Items => Groups.SelectMany(group => group.Items);
+
+    public IEnumerable<ItemView> AllItems => Items.SelectMany(item => item.SubItems.Prepend(item));
 
     public ColumnView? Column(Guid columnId) => Columns.FirstOrDefault(column => column.Id == columnId);
 

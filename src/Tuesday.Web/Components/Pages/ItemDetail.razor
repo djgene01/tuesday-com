@@ -1,4 +1,5 @@
 @page "/board/{BoardId:guid}/item/{ItemId:guid}"
+@using Tuesday.Web.Components.Board
 @using Microsoft.AspNetCore.Authorization
 @using Tuesday.Application.Boards
 @using Tuesday.Application.Tenancy
@@ -49,6 +50,8 @@ else
                 </div>
             }
         </section>
+
+        <SubItemsPanel BoardId="BoardId" ItemId="ItemId" CanEdit="@(_card?.CanEdit ?? false)" @rendermode="InteractiveServer" />
 
         <UpdateThread BoardId="BoardId" ItemId="ItemId" CanEdit="_card?.CanEdit ?? false" @rendermode="InteractiveServer" />
 

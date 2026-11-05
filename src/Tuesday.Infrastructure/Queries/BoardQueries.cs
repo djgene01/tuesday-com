@@ -45,7 +45,7 @@ public sealed class BoardQueries(IDbContextFactory<TuesdayDbContext> contextFact
         var items = await dbContext.Items.AsNoTracking()
             .Where(item => item.BoardId == boardId)
             .OrderBy(item => item.Position)
-            .Select(item => new { item.Id, item.Name, item.GroupId })
+            .Select(item => new { item.Id, item.Name, item.GroupId, item.ParentItemId })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -77,20 +77,41 @@ public sealed class BoardQueries(IDbContextFactory<TuesdayDbContext> contextFact
             .Select(column => new ColumnView(column.Id, column.Title, column.Type, column.SettingsJson))
             .ToList();
 
+        // Sub-items are attached to their parent inside its group. A row whose parent lives
+        // in another group (only possible if data was written outside the app) is promoted to
+        // the top level rather than silently disappearing.
+        var byGroup = items.ToLookup(item => item.GroupId);
+        var byParent = items.Where(item => item.ParentItemId is not null)
+            .ToLookup(item => item.ParentItemId!.Value);
+        var groupOf = items.ToDictionary(item => item.Id, item => item.GroupId);
+
         var groupViews = groups
             .Select(group => new GroupView(
                 group.Id,
                 group.Title,
                 group.Colour,
-                items.Where(item => item.GroupId == group.Id)
+                byGroup[group.Id]
+                    .Where(item => item.ParentItemId is null
+                        || !groupOf.TryGetValue(item.ParentItemId.Value, out var parentGroup)
+                        || parentGroup != group.Id)
                     .Select(item => new ItemView(
                         item.Id,
                         item.Name,
-                        byItem.TryGetValue(item.Id, out var map) ? map : new Dictionary<Guid, string?>()))
+                        Cells(item.Id),
+                        item.ParentItemId,
+                        item.GroupId)
+                    {
+                        SubItems = byParent[item.Id]
+                            .Select(child => new ItemView(child.Id, child.Name, Cells(child.Id), child.ParentItemId, child.GroupId))
+                            .ToList()
+                    })
                     .ToList()))
             .ToList();
 
         return new BoardModel(board.Id, board.Name, columnViews, groupViews);
+
+        IReadOnlyDictionary<Guid, string?> Cells(Guid itemId) =>
+            byItem.TryGetValue(itemId, out var map) ? map : new Dictionary<Guid, string?>();
     }
 
     private static string? Display(string? text, decimal? number, DateOnly? date, bool? flag)

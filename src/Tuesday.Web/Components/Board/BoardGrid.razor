@@ -8,6 +8,7 @@
 @using Tuesday.Domain.Automation
 @inject Tuesday.Infrastructure.Automations.AutomationService Automations
 @inject TenantContextBootstrapper Bootstrapper
+@inject Tuesday.Infrastructure.Boards.ItemEditor Editor
 
 @*
     The grid carries monday.com's visual language: a white bordered card, a 34px row,
@@ -88,7 +89,9 @@
                     <Virtualize Items="_rows" Context="row" SpacerElement="tr" OverscanCount="8">
                         @if (row.Group is not null)
                         {
-                            <tr class="group-row" @key="RowKey(row)" style="--group: @GroupHex(row.Group.Colour)">
+                            <tr class="group-row" @key="RowKey(row)" style="--group: @GroupHex(row.Group.Colour)"
+                                @ondragover:preventDefault
+                                @ondrop="() => DropOnGroupAsync(row.Group.Id)">
                                 <td colspan="@(board.Columns.Count + 2)"
                                     class="border-b border-line px-3 py-2"
                                     style="background: @Tint(row.Group.Colour)">
@@ -102,15 +105,25 @@
                         }
                         else if (row.Item is not null)
                         {
-                            <tr @key="RowKey(row)" class="group border-b border-line/80 last:border-0 hover:bg-canvas/70">
-                                <td class="py-0 pl-3 align-middle">
-                                    <a class="row-open grid h-6 w-6 place-items-center rounded text-ink-faint opacity-0 transition hover:bg-brand-tint hover:text-brand-ink focus-visible:opacity-100 group-hover:opacity-100"
-                                       href="@($"/board/{BoardId}/item/{row.Item.Id}")"
-                                       aria-label="@($"Open {row.Item.Name}")"><span aria-hidden="true">›</span></a>
+                            <tr @key="RowKey(row)"
+                                class="group border-b border-line/80 last:border-0 hover:bg-canvas/70 @(_dragging == row.Item.Id ? "opacity-50" : null) @(_dropKey == row.Key ? "shadow-[inset_0_2px_0_0_var(--color-brand)]" : null)"
+                                draggable="@(CanEdit ? "true" : "false")"
+                                @ondragstart="() => StartDrag(row.Item.Id)"
+                                @ondragend="() => EndDrag()"
+                                @ondragover:preventDefault
+                                @ondragenter="() => _dropKey = row.Key"
+                                @ondrop="() => DropOnItemAsync(row)">
+                                <td class="py-0 pl-2 align-middle">
+                                    <span class="flex items-center gap-0.5">
+                                        <span class="w-3 shrink-0 text-center text-[10px] text-ink-faint @(row.IsSubItem ? "" : "invisible")" aria-hidden="true">└</span>
+                                        <a class="row-open grid h-6 w-6 place-items-center rounded text-ink-faint opacity-0 transition hover:bg-brand-tint hover:text-brand-ink focus-visible:opacity-100 group-hover:opacity-100"
+                                           href="@($"/board/{BoardId}/item/{row.Item.Id}")"
+                                           aria-label="@($"Open {row.Item.Name}")"><span aria-hidden="true">›</span></a>
+                                    </span>
                                 </td>
-                                <td class="py-0 align-middle">
-                                    <input class="h-[34px] w-full border-0 bg-transparent px-1 text-[13px] font-medium text-ink outline-none focus:bg-brand-tint/60 focus:ring-1 focus:ring-inset focus:ring-brand disabled:cursor-default"
-                                           aria-label="Item name"
+                                <td class="py-0 align-middle @(row.IsSubItem ? "pl-5" : null)">
+                                    <input class="h-[34px] w-full border-0 bg-transparent px-1 text-[13px] font-medium text-ink outline-none focus:bg-brand-tint/60 focus:ring-1 focus:ring-inset focus:ring-brand disabled:cursor-default @(row.IsSubItem ? "text-[12.5px] font-normal" : null)"
+                                           aria-label="@(row.IsSubItem ? $"Sub-item name" : "Item name")"
                                            value="@ItemNameById(row.Item.Id)"
                                            disabled="@(!CanEdit)"
                                            @oninput="e => _pendingNames[row.Item.Id] = e.Value?.ToString()"
@@ -192,17 +205,117 @@
             foreach (var item in group.Items)
             {
                 rows.Add(new GridRow($"i:{item.Id}", null, item));
-                _names[item.Id] = item.Name;
+                AddCells(item);
 
-                foreach (var column in _board.Columns)
+                foreach (var child in item.SubItems)
                 {
-                    _cells[(item.Id, column.Id)] = item.Cells.TryGetValue(column.Id, out var value) ? value : null;
+                    rows.Add(new GridRow($"s:{child.Id}", null, child, IsSubItem: true));
+                    AddCells(child);
                 }
             }
         }
 
         _rows = rows;
         _totalRows = rows.Count;
+
+        void AddCells(ItemView item)
+        {
+            _names[item.Id] = item.Name;
+
+            foreach (var column in _board!.Columns)
+            {
+                _cells[(item.Id, column.Id)] = item.Cells.TryGetValue(column.Id, out var value) ? value : null;
+            }
+        }
+    }
+
+    // --- drag and drop ---------------------------------------------------------------
+
+    private Guid? _dragging;
+    private string? _dropKey;
+
+    private void StartDrag(Guid itemId)
+    {
+        if (CanEdit)
+        {
+            _dragging = itemId;
+        }
+    }
+
+    private void EndDrag()
+    {
+        _dragging = null;
+        _dropKey = null;
+    }
+
+    /// <summary>Drops onto a row: the dragged item takes that row's place in its group.</summary>
+    private async Task DropOnItemAsync(GridRow target)
+    {
+        if (_dragging is not { } itemId || target.Item is null || itemId == target.Item.Id)
+        {
+            EndDrag();
+            return;
+        }
+
+        var group = _board?.Groups.FirstOrDefault(candidate => candidate.Items.Any(item => item.Id == target.Item.Id || item.SubItems.Any(sub => sub.Id == target.Item.Id)));
+        if (group is null)
+        {
+            EndDrag();
+            return;
+        }
+
+        var draggedIsSubItem = group.Items.Any(item => item.SubItems.Any(sub => sub.Id == itemId));
+
+        // Dropping a top-level row onto a sub-item places it just after that sub-item's parent,
+        // so the row stays top-level instead of silently landing at an unrelated index.
+        if (target.IsSubItem && !draggedIsSubItem)
+        {
+            var parent = group.Items.FirstOrDefault(item => item.SubItems.Any(sub => sub.Id == target.Item.Id));
+
+            if (parent is not null)
+            {
+                var afterParent = group.Items.ToList().FindIndex(item => item.Id == parent.Id) + 1;
+                await MoveAsync(itemId, group.Id, Math.Max(0, afterParent));
+                return;
+            }
+        }
+
+        // Index within the target's own scope: top-level siblings, or a parent's sub-items.
+        var scope = target.IsSubItem
+            ? group.Items.FirstOrDefault(item => item.SubItems.Any(sub => sub.Id == target.Item.Id))?.SubItems ?? []
+            : group.Items;
+
+        var index = scope.ToList().FindIndex(item => item.Id == target.Item.Id);
+        await MoveAsync(itemId, group.Id, Math.Max(0, index));
+    }
+
+    private async Task DropOnGroupAsync(Guid groupId)
+    {
+        if (_dragging is not { } itemId)
+        {
+            EndDrag();
+            return;
+        }
+
+        var group = _board?.Groups.FirstOrDefault(candidate => candidate.Id == groupId);
+        var count = group?.Items.Count ?? 0;
+
+        await MoveAsync(itemId, groupId, count);
+    }
+
+    private async Task MoveAsync(Guid itemId, Guid groupId, int index)
+    {
+        EndDrag();
+
+        var result = await Editor.MoveAsync(itemId, groupId, index);
+        if (!result.Succeeded)
+        {
+            _error = result.Error;
+            return;
+        }
+
+        _error = null;
+        await RestoreAsync();
     }
 
     private string? ItemName(ItemView item) =>
@@ -390,6 +503,12 @@
             return;
         }
 
+        if (args.AltKey && args.Key is "ArrowUp" or "ArrowDown")
+        {
+            await MoveByKeyboardAsync(itemId, args.Key == "ArrowUp" ? -1 : 1);
+            return;
+        }
+
         if (args.Key != "Enter")
         {
             return;
@@ -405,10 +524,39 @@
         }
     }
 
+    /// <summary>Alt+Arrow moves the focused row one place, the keyboard equivalent of a drag.</summary>
+    private async Task MoveByKeyboardAsync(Guid itemId, int delta)
+    {
+        if (!CanEdit || _board is null)
+        {
+            return;
+        }
+
+        foreach (var group in _board.Groups)
+        {
+            var item = group.Items.FirstOrDefault(candidate => candidate.Id == itemId);
+
+            if (item is not null)
+            {
+                var target = group.Items.ToList().FindIndex(candidate => candidate.Id == itemId) + delta;
+                await MoveAsync(itemId, group.Id, Math.Max(0, target));
+                return;
+            }
+
+            var parent = group.Items.FirstOrDefault(candidate => candidate.SubItems.Any(sub => sub.Id == itemId));
+            if (parent is not null)
+            {
+                var subIndex = parent.SubItems.ToList().FindIndex(candidate => candidate.Id == itemId) + delta;
+                await MoveAsync(itemId, group.Id, Math.Max(0, subIndex));
+                return;
+            }
+        }
+    }
+
     /// <summary>
     /// A single row of the flattened table. Exactly one of <paramref name="Group"/> and
     /// <paramref name="Item"/> is set; <paramref name="Key"/> must stay stable so Virtualize
     /// can reuse a row's DOM when the visible window moves.
     /// </summary>
-    private sealed record GridRow(string Key, GroupView? Group, ItemView? Item);
+    private sealed record GridRow(string Key, GroupView? Group, ItemView? Item, bool IsSubItem = false);
 }

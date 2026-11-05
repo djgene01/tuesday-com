@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<Tuesday.Infrastructure.Queries.WorkspaceQueries>();
         services.AddScoped<Tuesday.Infrastructure.Queries.BoardQueries>();
         services.AddScoped<Tuesday.Infrastructure.Values.ColumnValueWriter>();
+        services.AddScoped<Tuesday.Infrastructure.Boards.ItemEditor>();
         services.AddScoped<Tuesday.Infrastructure.Values.BoardColumnService>();
         services.AddScoped<Tuesday.Infrastructure.Views.ViewService>();
         services.AddScoped<Tuesday.Infrastructure.Views.DependencyService>();

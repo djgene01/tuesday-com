@@ -161,6 +161,37 @@ public sealed class DevelopmentSeeder(
             created.Add(item);
         }
 
+        // A handful of sub-items on the first rows so a fresh install demonstrates nesting
+        // without inflating the seeded board.
+        string[][] subItemNames =
+        [
+            ["Draft the brief", "Collect references", "Get sign-off"],
+            ["Book the venue", "Confirm the speaker"],
+            ["Write the landing copy", "Review with legal"]
+        ];
+
+        for (var index = 0; index < subItemNames.Length; index++)
+        {
+            var parent = created[index];
+
+            for (var sub = 0; sub < subItemNames[index].Length; sub++)
+            {
+                var child = Item.Create(
+                    tenant.Id,
+                    board.Id,
+                    parent.GroupId,
+                    subItemNames[index][sub],
+                    sub,
+                    parent.Id);
+
+                dbContext.Items.Add(child);
+
+                dbContext.ItemColumnValues.AddRange(
+                    Cell(dbContext, tenant, child, columns[1], people[sub % people.Count].Id.ToString(), text: people[sub % people.Count].DisplayName),
+                    Cell(dbContext, tenant, child, columns[2], statuses[(index + sub) % statuses.Length], text: statuses[(index + sub) % statuses.Length]));
+            }
+        }
+
         // A sparse chain of edges per group gives Gantt real arrows without a dense graph.
         for (var index = 3; index < 60; index += 3)
         {
