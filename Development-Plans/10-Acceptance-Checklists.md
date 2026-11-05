@@ -179,6 +179,10 @@ Each phase section ends with a **user validation gate**: a person, not a test, c
 | P6-17 ☑ | Production-mode first run is usable | **yes** | `0.9.3` image run with `ASPNETCORE_ENVIRONMENT=Production`, mounted OpenIddict pfx, no seeder. Migrations applied (7 rows in `__EFMigrationsHistory`), bootstrap admin created, `/health/ready` 200, sign-in 200, a board created (3 groups, 4 columns, 1 view), an item added through the grid and confirmed in PostgreSQL after reload |
 | P6-18 ☐ | An invited person receives a unique credential | **no** | `Workspace.InviteAsync` creates the account with the literal demo password `Tuesday!Demo1`; discovered during the Production run. Needs an invite token or forced reset |
 | P6-19 ☑ | Container log is free of the GSSAPI load failure | **yes** | `libgssapi-krb5-2` added to the runtime stage; `docker logs` no longer shows `Cannot load library libgssapi_krb5.so.2` |
+| P6-20 ☑ | UI review pass on every primary route | **yes** | 13 routes captured at 1440 px and 390 px with console-error, overflow and label checks; fixes below verified by screenshot |
+| P6-21 ☑ | Board table fits a 1440 px window | **yes** | column minimums reduced (item 220→170, data 140→110); table 1300 px inside a 1312 px scroller, no horizontal scroll, every header visible |
+| P6-22 ☑ | Landing reads as one page | **yes** | full status card + Runtime/Probes cards replaced by a one-line status strip and a "System details" disclosure with a chevron |
+| P6-23 ☑ | Dashboard chart bars legible | **yes** | bars 10 px → 12 px tall; the earlier capture read as faint tracks |
 | P6-6 ☑ | WebSocket upgrade verified at the proxy | **yes** | nginx 1.29 with `Upgrade`/`Connection` mapping and 3600 s read timeout; sub-item panel expanded through `:8081` with the circuit live |
 | P6-7 ☑ | Perf targets met at 200 users, 5k-item board | **yes — 200 live circuits** | time to first grid row p95 **416 ms** (target 1,500 ms), p50 331 ms, 200/200 alive after a 30 s hold, app memory 3.0 GiB (≈12 MB/circuit); HTTP shell soak: 0% errors. Details in `docs/runbooks/performance.md` |
 | P6-8 ○ | axe clean (no serious/critical) on all primary routes | **no** | — |

@@ -65,7 +65,7 @@ else
                 {
                     <div class="mb-2 flex items-center gap-3 last:mb-0">
                         <span class="w-[110px] shrink-0 truncate text-[13px] text-ink-soft">@lane.Label</span>
-                        <span class="h-2.5 flex-1 overflow-hidden rounded-full bg-canvas">
+                        <span class="h-3 flex-1 overflow-hidden rounded-full bg-canvas">
                             <span class="block h-full rounded-full" style="width:@(Width(lane.Count)); background:@StatusColour(lane.Label)"></span>
                         </span>
                         <span class="w-9 text-right text-[12px] tabular-nums text-ink-soft">@lane.Count</span>
@@ -80,7 +80,7 @@ else
                     var group = _board.Groups[i];
                     <div class="mb-2 flex items-center gap-3 last:mb-0">
                         <span class="w-[110px] shrink-0 truncate text-[13px] text-ink-soft">@group.Title</span>
-                        <span class="h-2.5 flex-1 overflow-hidden rounded-full bg-canvas">
+                        <span class="h-3 flex-1 overflow-hidden rounded-full bg-canvas">
                             <span class="block h-full rounded-full" style="width:@(Width(group.Items.Count)); background:@GroupColour(i)"></span>
                         </span>
                         <span class="w-9 text-right text-[12px] tabular-nums text-ink-soft">@group.Items.Count</span>

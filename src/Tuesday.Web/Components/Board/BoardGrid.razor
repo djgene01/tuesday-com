@@ -73,10 +73,10 @@
                 <thead class="sticky top-0 z-10 bg-surface">
                     <tr class="border-b border-line text-[11px] font-medium uppercase tracking-[0.04em] text-ink-faint">
                         <th class="w-10 py-2 pl-3" scope="col"><span class="sr-only">Open</span></th>
-                        <th class="min-w-[220px] py-2 text-left font-medium" scope="col">Item</th>
+                        <th class="min-w-[170px] py-2 text-left font-medium" scope="col">Item</th>
                         @foreach (var column in board.Columns)
                         {
-                            <th class="min-w-[140px] px-2 py-2 text-left font-medium" scope="col">
+                            <th class="min-w-[110px] px-2 py-2 text-left font-medium" scope="col">
                                 <span class="flex items-center gap-1.5">
                                     <span class="text-ink-faint/70" aria-hidden="true">@ColumnGlyph(column.Type)</span>
                                     @column.Title

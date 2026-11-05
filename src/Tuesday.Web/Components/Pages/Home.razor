@@ -21,48 +21,53 @@
         </div>
     </section>
 
-    <section class="ui-card overflow-hidden" aria-labelledby="deps">
-        <header class="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
-            <h2 id="deps" class="font-display text-[15px] font-semibold text-ink">Live status</h2>
-            <span class="ui-pill @(_report.Status == HealthStatus.Healthy ? "bg-status-done/15 text-[#007a4d]" : "bg-status-working/20 text-[#8a4b00]")">
-                @_report.Status
+    @* A single strip answers "is it up?" at a glance; the ops detail lives behind a disclosure so
+       the page reads as one product rather than a marketing page with a debug panel stapled on. *@
+    <section class="mb-6 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-card border border-line bg-surface px-4 py-3"
+             aria-labelledby="deps">
+        <h2 id="deps" class="font-display text-[13px] font-semibold text-ink">Live status</h2>
+        <span class="ui-pill @(_report.Status == HealthStatus.Healthy ? "bg-status-done/15 text-[#00663f]" : "bg-status-working/20 text-[#8a4b00]")">
+            @_report.Status
+        </span>
+        @foreach (var entry in _report.Entries)
+        {
+            <span class="inline-flex items-center gap-1.5 text-[12px] text-ink-soft">
+                <span class="h-1.5 w-1.5 rounded-full @(entry.Value.Status == HealthStatus.Healthy ? "bg-status-done" : entry.Value.Status == HealthStatus.Degraded ? "bg-status-working" : "bg-status-stuck")"
+                      aria-hidden="true"></span>
+                @entry.Key
             </span>
-            <span class="ml-auto text-[11px] text-ink-faint">checked @_checkedAt.ToString("HH:mm:ss") UTC</span>
-        </header>
-
-        <ul class="divide-y divide-line">
-            @foreach (var entry in _report.Entries)
-            {
-                <li class="flex flex-wrap items-center gap-3 px-4 py-2.5">
-                    <span class="h-2 w-2 rounded-full @(entry.Value.Status == HealthStatus.Healthy ? "bg-status-done" : entry.Value.Status == HealthStatus.Degraded ? "bg-status-working" : "bg-status-stuck")" aria-hidden="true"></span>
-                    <span class="w-[110px] text-[13px] font-medium text-ink">@entry.Key</span>
-                    <span class="text-[12px] text-ink-soft">@entry.Value.Description</span>
-                    <span class="ml-auto text-[11px] font-medium @(entry.Value.Status == HealthStatus.Healthy ? "text-[#007a4d]" : "text-status-stuck")">@entry.Value.Status</span>
-                </li>
-            }
-        </ul>
+        }
+        <span class="ml-auto text-[11px] text-ink-faint">checked @_checkedAt.ToString("HH:mm:ss") UTC</span>
     </section>
 
-    <section class="mt-4 grid gap-3 sm:grid-cols-2" aria-labelledby="runtime">
-        <div class="ui-card p-4">
-            <h2 id="runtime" class="mb-2 font-display text-[15px] font-semibold text-ink">Runtime</h2>
-            <dl class="space-y-1.5 text-[12px]">
-                <div class="flex justify-between gap-3"><dt class="text-ink-soft">Environment</dt><dd class="text-ink">@Environment.EnvironmentName</dd></div>
-                <div class="flex justify-between gap-3"><dt class="text-ink-soft">Runtime</dt><dd class="text-ink">@System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription</dd></div>
-                <div class="flex justify-between gap-3"><dt class="text-ink-soft">Started</dt><dd class="text-ink">@_startedAt.ToString("yyyy-MM-dd HH:mm:ss") UTC</dd></div>
-            </dl>
-        </div>
+    <details class="group rounded-card border border-line bg-surface">
+        <summary class="flex cursor-pointer list-none items-center gap-1.5 px-4 py-3 text-[12px] font-medium text-ink-soft marker:hidden">
+            <span class="inline-block text-[10px] transition-transform group-open:rotate-90" aria-hidden="true">▸</span>
+            System details
+            <span class="ml-1 text-ink-faint">— runtime, start time, probe endpoints</span>
+        </summary>
 
-        <div class="ui-card p-4">
-            <h2 class="mb-2 font-display text-[15px] font-semibold text-ink">Probes</h2>
-            <div class="flex flex-col gap-2 text-[12px]">
-                <a class="flex items-center justify-between gap-3 rounded-control border border-line px-3 py-2 text-ink no-underline hover:border-line-strong hover:bg-canvas"
-                   href="/health/ready"><span>Readiness</span><code class="text-ink-soft">/health/ready</code></a>
-                <a class="flex items-center justify-between gap-3 rounded-control border border-line px-3 py-2 text-ink no-underline hover:border-line-strong hover:bg-canvas"
-                   href="/health/live"><span>Liveness</span><code class="text-ink-soft">/health/live</code></a>
+        <div class="grid gap-4 border-t border-line px-4 py-3 sm:grid-cols-2">
+            <div>
+                <h3 class="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-faint">Runtime</h3>
+                <dl class="space-y-1 text-[12px]">
+                    <div class="flex justify-between gap-3"><dt class="text-ink-soft">Environment</dt><dd class="text-ink">@Environment.EnvironmentName</dd></div>
+                    <div class="flex justify-between gap-3"><dt class="text-ink-soft">Runtime</dt><dd class="text-ink">@System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription</dd></div>
+                    <div class="flex justify-between gap-3"><dt class="text-ink-soft">Started</dt><dd class="text-ink">@_startedAt.ToString("yyyy-MM-dd HH:mm:ss") UTC</dd></div>
+                </dl>
+            </div>
+
+            <div>
+                <h3 class="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-faint">Probes</h3>
+                <div class="flex flex-col gap-2 text-[12px]">
+                    <a class="flex items-center justify-between gap-3 rounded-control border border-line px-3 py-1.5 text-ink no-underline hover:border-line-strong hover:bg-canvas"
+                       href="/health/ready"><span>Readiness</span><code class="text-ink-soft">/health/ready</code></a>
+                    <a class="flex items-center justify-between gap-3 rounded-control border border-line px-3 py-1.5 text-ink no-underline hover:border-line-strong hover:bg-canvas"
+                       href="/health/live"><span>Liveness</span><code class="text-ink-soft">/health/live</code></a>
+                </div>
             </div>
         </div>
-    </section>
+    </details>
 </main>
 
 @code {

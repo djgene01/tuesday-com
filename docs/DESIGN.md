@@ -115,3 +115,14 @@ utilities unlayered after `app.css` makes source order decide instead.
 
 Preflight is deliberately not imported: the reset would silently change margins on the
 older pages that still rely on their own styles.
+
+
+## Review pass notes (2026-11-05)
+
+- The board grid's column minimums were sized for ten columns at 1600 px; at 1440 px the table
+  overflowed by ~320 px and looked like it stopped early. Item 170 px, data columns 110 px, and the
+  table now fits exactly with no horizontal scroll.
+- The landing page previously stacked a marketing hero above a health card, a runtime card and a
+  probe card, which read as two different products. It is now a hero plus a one-line status strip
+  and a `details` disclosure for runtime and probes.
+- Dashboard bars moved from 10 px to 12 px; at 10 px they read as faint tracks against the canvas.
