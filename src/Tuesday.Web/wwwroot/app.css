@@ -28,7 +28,14 @@
 
 * { box-sizing: border-box; }
 
+html {
+  /* Decorative blobs are positioned outside the content column; clip them rather than letting
+     a phone scroll sideways. Content itself is never clipped because nothing is wider than 100%. */
+  overflow-x: clip;
+}
+
 html, body {
+  overflow-x: hidden;
   margin: 0;
   padding: 0;
   background: var(--tue-canvas);

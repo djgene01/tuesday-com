@@ -1,7 +1,22 @@
-# Release notes — Tuesday.com 0.9.7 (release candidate)
+# Release notes — Tuesday.com 0.9.9 (release candidate)
 
 **Status:** release candidate for an internal work-tracking deployment. Not 1.0.
-**Date:** 2026-11-05 · **Version:** 0.9.7 · **Image tag:** `tuesday-web:0.9.7`
+**Date:** 2026-11-05 · **Version:** 0.9.9 · **Image tag:** `tuesday-web:0.9.9`
+
+Changes since 0.9.8:
+
+- **A real marketing home page.** The landing page now carries the shape a buyer expects — sticky
+  header, hero with a product image and floating proof chips, live-status strip, six use-case cards,
+  alternating feature rows (updates, automations, self-hosting), a closing call to action and a
+  four-column footer — inside the Digital Wellness language. Copy is this repository's own; the
+  composition is standard SaaS, not another product's assets.
+- The public shell is its own layout (`MarketingLayout`), so visitors never see the signed-in app
+  rail. The signed-in product still uses `MainLayout`.
+- Three illustrations generated locally with the self-hosted FLUX endpoint, stored in
+  `wwwroot/img/` (no third-party image host, no licence ambiguity).
+- Horizontal overflow fixed on a 390 px viewport: decorative blobs are desktop-only, the compose
+  snippet wraps instead of forcing its grid wider, and `html/body` clip stray decoration.
+- axe stays clean on all twelve routes after the rebuild.
 
 Changes since 0.9.4:
 
