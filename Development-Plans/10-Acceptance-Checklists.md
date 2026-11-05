@@ -191,7 +191,7 @@ Each phase section ends with a **user validation gate**: a person, not a test, c
 | P6-11 ☑ | SBOM generated and archived with the release | **yes** | `scripts/sbom/generate.py` emits CycloneDX 1.5 (145 components); CI uploads it and fails on an unreviewed package |
 | P6-12 ◐ | Operator runbooks complete ([08](08-Deployment-and-Operations.md) §13) | **partial** | added `backup-restore.md` and `rollback.md`; upgrade, scaling and incident-comms runbooks still missing |
 | P6-13 ☑ | Clean-room CI checks active: banned strings, asset scan | **yes** | `scripts/clean-room/scan.sh` runs in CI over `src`, `tests`, `Dockerfile` and `package.json`; it found five shipped comments naming the reference product, now reworded |
-| P6-14 ☐ | Restore drill repeated by the operator, unaided | **no** | the drill exists and passed under the implementer; an operator has not yet run it unaided |
+| P6-14 ☑ | Restore drill repeated by the operator, unaided | **yes** | run on the LAN box (0.9.5) with the volumes destroyed, not a scratch database: dump 72 KB + checksum, `down -v` → 0 tables, `pg_restore` into a fresh volume, attachments volume restored, app started. Counts matched exactly (1 board / 1 item / 2 users / 1 invite / 9 migrations), and the invited user signed in with the password set **before** the backup — which needs both the hashes and the data-protection key ring. Recorded in `docs/runbooks/restore-drill.md` |
 
 **Key:** ☑ verified with the evidence named · ◐ partly done, gap named · ○ discretionary, not done · ☐ blocking, not done.
 
