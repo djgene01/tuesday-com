@@ -192,8 +192,14 @@ var app = builder.Build();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    app.UseHsts();
-    app.UseHttpsRedirection();
+
+    // A LAN/VPN install reached over plain HTTP must not advertise HSTS or redirect to a port it
+    // does not serve. Set Http__UseHttps=false there; leave it unset for anything public.
+    if (app.Configuration.GetValue("Http:UseHttps", true))
+    {
+        app.UseHsts();
+        app.UseHttpsRedirection();
+    }
 }
 
 app.UseMiddleware<CorrelationIdMiddleware>();

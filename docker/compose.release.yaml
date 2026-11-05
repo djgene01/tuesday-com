@@ -27,6 +27,9 @@ services:
       ConnectionStrings__Default: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-tuesday};Username=${POSTGRES_USER:-tuesday};Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD};Timeout=10"
       Redis__Configuration: "redis:6379,abortConnect=false"
       Storage__Root: /var/tuesday/files
+      # Plain-HTTP LAN/VPN installs set HTTP_USEHTTPS=false: no HSTS, no redirect to an HTTPS port
+      # this stack does not serve. Leave true (or unset) behind a TLS terminator.
+      Http__UseHttps: ${HTTP_USEHTTPS:-true}
       Email__Enabled: ${EMAIL_ENABLED:-false}
       Email__Host: ${EMAIL_HOST:-}
       Email__From: ${EMAIL_FROM:-no-reply@tuesday.local}
