@@ -69,7 +69,7 @@ public sealed class ItemEditor(
             // A sub-item inherits its parent's group so the two cannot drift apart.
             groupId = parent.GroupId;
 
-            await EnsureSubitemBoardAsync(dbContext, tenantId, boardId, cancellationToken).ConfigureAwait(false);
+            await SubitemSurface.EnsureAsync(dbContext, tenantId, boardId, cancellationToken).ConfigureAwait(false);
         }
 
         var lastPosition = await dbContext.Items
@@ -112,7 +112,7 @@ public sealed class ItemEditor(
             .CreateDbContextAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var subitemBoardId = await EnsureSubitemBoardAsync(dbContext, tenantId, boardId, cancellationToken)
+        var subitemBoardId = await SubitemSurface.EnsureAsync(dbContext, tenantId, boardId, cancellationToken)
             .ConfigureAwait(false);
 
         var parentColumns = await dbContext.BoardColumns.AsNoTracking()
@@ -156,31 +156,6 @@ public sealed class ItemEditor(
         }
 
         return ItemWriteResult.Ok(subitemBoardId, copied);
-    }
-
-    /// <summary>Returns the sub-item board's id, creating it the first time it is needed.</summary>
-    private static async Task<Guid> EnsureSubitemBoardAsync(
-        TuesdayDbContext dbContext,
-        Guid tenantId,
-        Guid boardId,
-        CancellationToken cancellationToken)
-    {
-        var existing = await dbContext.SubitemBoards
-            .Where(candidate => candidate.BoardId == boardId)
-            .Select(candidate => (Guid?)candidate.Id)
-            .FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-        if (existing is { } id)
-        {
-            return id;
-        }
-
-        var created = SubitemBoard.Create(tenantId, boardId);
-        dbContext.SubitemBoards.Add(created);
-        await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-
-        return created.Id;
     }
 
     /// <summary>

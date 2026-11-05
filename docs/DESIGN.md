@@ -83,6 +83,7 @@ Rules that keep it coherent:
 | Workspace | `Workspace.razor` — board cards, create/invite cards |
 | Board shell | `BoardView.razor` — breadcrumb, title, view tabs |
 | Grid | `BoardGrid.razor` — virtualised rows, status cells, group bands |
+| Sub-item columns | `/board/{id}/subitems` — table + inline add form |
 | Item | `ItemDetail.razor` + `UpdateThread` / `AttachmentPanel` |
 | Views | `KanbanView`, `CalendarView`, `TimelineView`, `GanttView` |
 | Dashboard | `BoardDashboard.razor` — stat cards, share-of-board bars |

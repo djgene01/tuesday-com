@@ -277,7 +277,7 @@ This is **0.9.0**, a release candidate. The honest limit list is in
 | Automations, scheduled sweep, webhooks, REST API | ✅ shipped |
 | Identity, TOTP, OAuth 2.0 token server, API tokens | ✅ shipped |
 | Dashboard, health, logging, security headers, container | ✅ shipped |
-| Sub-items | ✅ inline expander with its own column set |
+| Sub-items | ✅ inline expander, own column set with its own editor |
 | Drag reorder in the table grid | ⏳ planned |
 | Performance checkpoints | ✅ 5k: p95 136 ms · 100k: p95 1.77 s (`scripts/perf`) |
 | API pagination, idempotency keys, SSRF guard, webhook retries | ⏳ planned |

@@ -1,0 +1,72 @@
+@page "/board/{Id:guid}/subitems"
+@using Microsoft.AspNetCore.Authorization
+@using Tuesday.Application.Tenancy
+@using Tuesday.Infrastructure.Queries
+@using Tuesday.Web.Components.Board
+@attribute [Authorize(Policy = "capability:ViewWorkspace")]
+@inject WorkspaceQueries Queries
+@inject ITenantContext Tenant
+@inject IHttpContextAccessor HttpContextAccessor
+
+<PageTitle>@(_board is null ? "Not found" : $"Sub-item columns — {_board.Name}") — Tuesday.com</PageTitle>
+
+@if (_board is null)
+{
+    <main class="shell">
+        <p class="eyebrow">404</p>
+        <h1>Board not found</h1>
+        <p class="lede">Either it does not exist, or it is not shared with you.</p>
+        <p><a href="/workspace">Back to your workspace</a></p>
+    </main>
+}
+else
+{
+    <main class="mx-auto max-w-[1100px]">
+        <nav class="mb-1 flex items-center gap-1.5 text-xs text-ink-soft" aria-label="Breadcrumb">
+            <a class="no-underline hover:text-brand" href="/workspace">@_board.WorkspaceName</a>
+            <span aria-hidden="true">/</span>
+            <a class="no-underline hover:text-brand" href="@($"/board/{Id}")">@_board.Name</a>
+            <span aria-hidden="true">/</span>
+            <span class="text-ink-faint">Sub-items</span>
+        </nav>
+
+        <div class="mb-4 flex flex-wrap items-center gap-3">
+            <div>
+                <h1 class="font-display text-[26px] font-semibold leading-tight tracking-tight text-ink" tabindex="-1">Sub-item columns</h1>
+                <p class="mt-0.5 text-[13px] text-ink-soft">
+                    Columns that belong to @_board.Name's sub-items, independent of the board's own columns.
+                </p>
+            </div>
+            <a class="ui-btn-ghost ml-auto !h-9 !px-4 text-[13px]" href="@($"/board/{Id}")">Back to board</a>
+        </div>
+
+        <SubitemColumnsEditor BoardId="Id" CanEdit="_board.CanEdit" @rendermode="InteractiveServer" />
+    </main>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private BoardCard? _board;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Tenant.UserId is not { } userId || Tenant.Role is not { } role)
+        {
+            return;
+        }
+
+        _board = await Queries.FindBoardAsync(Id, userId, role);
+
+        if (_board is null && HttpContextAccessor.HttpContext is { } context)
+        {
+            // Set on OnStarting: assigning 4xx mid-render makes Blazor discard the body.
+            context.Response.OnStarting(() =>
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return Task.CompletedTask;
+            });
+        }
+    }
+}

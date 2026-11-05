@@ -159,15 +159,20 @@
                                             <h3 class="font-display text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Sub-items</h3>
                                             <span class="rounded-full bg-white px-1.5 py-0.5 text-[10px] font-medium text-ink-soft">@row.PanelFor.SubItems.Count</span>
 
-                                            @if (CanEdit)
-                                            {
-                                                <button type="button"
-                                                        class="ml-auto rounded-control border border-line-strong bg-surface px-2.5 py-1 text-[11px] font-medium text-ink transition hover:border-brand hover:text-brand disabled:opacity-50"
-                                                        disabled="@_busy"
-                                                        @onclick="CopySubItemColumnsAsync">
-                                                    @(board.HasSubItemColumns ? "Copy new columns from this board" : "Copy columns from this board")
-                                                </button>
-                                            }
+                                            <span class="ml-auto inline-flex items-center gap-2">
+                                                <a class="rounded-control px-2 py-1 text-[11px] font-medium text-ink-soft no-underline transition hover:text-brand"
+                                                   href="@($"/board/{BoardId}/subitems")">Manage sub-item columns</a>
+
+                                                @if (CanEdit)
+                                                {
+                                                    <button type="button"
+                                                            class="rounded-control border border-line-strong bg-surface px-2.5 py-1 text-[11px] font-medium text-ink transition hover:border-brand hover:text-brand disabled:opacity-50"
+                                                            disabled="@_busy"
+                                                            @onclick="CopySubItemColumnsAsync">
+                                                        @(board.HasSubItemColumns ? "Copy missing columns" : "Copy columns from this board")
+                                                    </button>
+                                                }
+                                            </span>
                                         </div>
 
                                         @if (!board.HasSubItemColumns)

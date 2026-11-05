@@ -38,10 +38,10 @@ Stated plainly because they are real. Each maps to an open item in
    this hardware against the fixture scripts in `scripts/perf`: 5,000 items give p50 105 ms /
    p95 136 ms for the full page render; a 100,000-item board gives p50 1.72 s / p95 1.77 s.
    The 100k figure is a single-user render checkpoint, not a concurrent-load result.
-2. **Sub-items are one level deep and their columns start as a copy.** Expansion, creation,
-   ordering and cell editing work inline. The column *definitions* are owned by a per-board
-   sub-item surface and are seeded by a one-way copy of the parent's columns; there is no UI
-   yet for adding, renaming or deleting a sub-item column on its own.
+2. **Sub-items are one level deep.** Expansion, creation, ordering and cell editing work inline.
+   Sub-item columns are owned by a per-board sub-item surface: they can be copied from the
+   parent board once (a one-way copy), then added, renamed, reordered and deleted at
+   `/board/{id}/subitems`. Deleting a column deletes its values after an explicit confirmation.
 3. **Grid drag is pointer-only for cross-group moves.** Alt+Arrow moves a row within its
    group and is the keyboard path; dragging across groups has no keyboard equivalent yet.
 4. **No load test has been run.** The 200-user / 5,000-item targets in

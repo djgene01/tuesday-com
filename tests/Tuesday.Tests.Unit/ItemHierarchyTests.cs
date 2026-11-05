@@ -1,6 +1,7 @@
 using Tuesday.Application.Boards;
 using Tuesday.Domain.Boards;
 using Tuesday.Domain.Items;
+using Tuesday.Infrastructure.Boards;
 
 namespace Tuesday.Tests.Unit;
 
@@ -66,6 +67,24 @@ public sealed class ItemHierarchyTests
         var item = Item.Create(Tenant, Board, Group, "Task 001", 0);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => item.MoveTo(Group, -1));
+    }
+
+    [Theory]
+    [InlineData("Due date", "due_date")]
+    [InlineData("  Effort (days) ", "effort_days")]
+    [InlineData("Status", "status")]
+    [InlineData("!!!", "column")]
+    public void A_sub_item_column_key_is_a_stable_slug(string title, string expected)
+    {
+        Assert.Equal(expected, SubitemColumnService.UniqueKey(title, new HashSet<string>()));
+    }
+
+    [Fact]
+    public void A_sub_item_column_key_gets_a_suffix_when_taken()
+    {
+        var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "status", "status_2" };
+
+        Assert.Equal("status_3", SubitemColumnService.UniqueKey("Status", taken));
     }
 
     [Fact]

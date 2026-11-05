@@ -76,7 +76,7 @@ Each phase section ends with a **user validation gate**: a person, not a test, c
 | P2-4 ☑ | Keyboard-only edit of a cell (U-2, U-13) | Keyboard script output |
 | P2-5 ✅ | Drag reorder within and across groups (U-6) | rows drag within and between groups in the grid; Alt+Arrow moves within a group (no keyboard cross-group move yet) |
 | P2-6 ☑ | Add-item row keeps focus after submit (U-5) | E2E assertion |
-| P2-7 ✅ | Subitem expand, own columns, copy-parent-columns **does not sync** (U-12) [S8] | inline expansion panel with its own column header; columns live on a per-board `subitem_boards` row; copy from parent is one-way by construction; no standalone sub-item column editor yet |
+| P2-7 ✅ | Subitem expand, own columns, copy-parent-columns **does not sync** (U-12) [S8] | inline expansion panel with its own column header; columns live on a per-board `subitem_boards` row; standalone editor at `/board/{id}/subitems` adds, renames, reorders and deletes them (delete removes values, confirmed); copy from parent is one-way by construction |
 | P2-8 ☑ | Optimistic update conflict shows a notice, no silent overwrite | Two-browser test |
 | P2-9 ✅ | **100k-item checkpoint**: page loads ≤ 3 s, no filesort on the board read [A2] | measured with `scripts/perf`: 5k p95 136 ms, 100k p95 1.77 s; board reads use the (BoardId, Position) index |
 | P2-10 ☑ | Projection consistency: 1,000 rows match JSON | Suite output |

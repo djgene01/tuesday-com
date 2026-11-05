@@ -1,0 +1,306 @@
+@using Tuesday.Application.Boards
+@using Tuesday.Domain.Boards
+@using Tuesday.Infrastructure.Boards
+@using Tuesday.Web.Security
+@inject SubitemColumnService Columns
+@inject ItemEditor Editor
+@inject TenantContextBootstrapper Bootstrapper
+
+@*
+    Standalone editor for the sub-item surface's columns. The parent board's columns are not
+    touched here: they are independent rows, which is what "the copy does not sync" means.
+*@
+
+<div class="ui-card overflow-hidden">
+    <header class="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
+        <div>
+            <h2 class="font-display text-[15px] font-semibold text-ink">Existing columns</h2>
+            <p class="mt-0.5 text-[12px] text-ink-soft">
+                These belong to sub-items only. Renaming or deleting one never changes this board's own columns.
+            </p>
+        </div>
+        <span class="ml-auto text-xs text-ink-faint">@_columns.Count</span>
+    </header>
+
+    @if (_error is not null)
+    {
+        <p class="border-b border-line bg-status-stuck/10 px-4 py-2 text-sm text-status-stuck" role="alert">@_error</p>
+    }
+
+    @if (_columns.Count == 0)
+    {
+        <div class="px-4 py-5">
+            <p class="text-sm text-ink-soft">No sub-item columns yet. Add one below, or start from a copy of this board's columns.</p>
+
+            @if (CanEdit)
+            {
+                <button type="button"
+                        class="mt-3 rounded-control border border-line-strong bg-surface px-3 py-1.5 text-[13px] font-medium text-ink transition hover:border-brand hover:text-brand disabled:opacity-50"
+                        disabled="@_busy"
+                        @onclick="CopyAsync">
+                    Copy columns from this board
+                </button>
+            }
+        </div>
+    }
+    else
+    {
+        <table class="w-full border-collapse text-[13px]">
+            <thead>
+                <tr class="border-b border-line text-[10px] uppercase tracking-[0.06em] text-ink-faint">
+                    <th class="px-4 py-2 text-left font-semibold">Title</th>
+                    <th class="w-40 px-2 py-2 text-left font-semibold">Type</th>
+                    <th class="w-40 px-2 py-2 text-right font-semibold">Order</th>
+                    <th class="w-32 px-4 py-2 text-right font-semibold">Remove</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var (column, index) in _columns.Select((c, i) => (c, i)))
+                {
+                    <tr class="border-b border-line/70 last:border-0">
+                        <td class="px-4 py-1.5">
+                            <input class="h-8 w-full max-w-sm rounded-control border border-transparent bg-transparent px-1 text-[13px] text-ink outline-none focus:border-brand focus:bg-surface"
+                                   aria-label="@($"Column title: {column.Title}")"
+                                   value="@column.Title"
+                                   disabled="@(!CanEdit)"
+                                   @onchange="e => RenameAsync(column.Id, e.Value?.ToString())" />
+                        </td>
+                        <td class="px-2 py-1.5 text-[12px] text-ink-soft">@TypeLabel(column.Type)</td>
+                        <td class="px-2 py-1.5 text-right">
+                            @if (CanEdit)
+                            {
+                                <span class="inline-flex">
+                                    <button type="button" class="grid h-7 w-7 place-items-center rounded text-ink-faint hover:bg-brand-tint hover:text-brand disabled:opacity-40"
+                                            aria-label="@($"Move {column.Title} left")"
+                                            disabled="@(index == 0 || _busy)"
+                                            @onclick="() => MoveAsync(column.Id, -1)">↑</button>
+                                    <button type="button" class="grid h-7 w-7 place-items-center rounded text-ink-faint hover:bg-brand-tint hover:text-brand disabled:opacity-40"
+                                            aria-label="@($"Move {column.Title} right")"
+                                            disabled="@(index == _columns.Count - 1 || _busy)"
+                                            @onclick="() => MoveAsync(column.Id, 1)">↓</button>
+                                </span>
+                            }
+                        </td>
+                        <td class="px-4 py-1.5 text-right">
+                            @if (CanEdit)
+                            {
+                                if (_confirming == column.Id)
+                                {
+                                    <span class="inline-flex items-center gap-1">
+                                        <button type="button" class="rounded-control bg-status-stuck px-2 py-1 text-[11px] font-semibold text-white"
+                                                disabled="@_busy"
+                                                @onclick="() => DeleteAsync(column.Id)">
+                                            Delete values too
+                                        </button>
+                                        <button type="button" class="rounded-control border border-line-strong px-2 py-1 text-[11px] text-ink-soft"
+                                                @onclick="() => _confirming = null">
+                                            Cancel
+                                        </button>
+                                    </span>
+                                }
+                                else
+                                {
+                                    <button type="button" class="rounded-control px-2 py-1 text-[11px] font-medium text-ink-faint transition hover:bg-status-stuck/10 hover:text-status-stuck"
+                                            aria-label="@($"Remove column {column.Title}")"
+                                            @onclick="() => _confirming = column.Id">
+                                        Remove
+                                    </button>
+                                }
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (CanEdit)
+    {
+        <div class="flex flex-wrap items-end gap-3 border-t border-line bg-canvas/50 px-4 py-3">
+            <label class="block">
+                <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">New column</span>
+                <input type="text"
+                       class="h-9 w-64 rounded-control border border-line-strong bg-surface px-2 text-[13px] text-ink outline-none focus:border-brand"
+                       placeholder="Column title"
+                       aria-label="New column title"
+                       @onchange="e => _newTitle = e.Value?.ToString() ?? string.Empty" />
+            </label>
+
+            <label class="block">
+                <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Type</span>
+                <select class="h-9 rounded-control border border-line-strong bg-surface px-2 text-[13px] text-ink outline-none focus:border-brand"
+                        aria-label="New column type"
+                        @onchange="e => _newType = ParseType(e.Value?.ToString())">
+                    @foreach (var type in Types)
+                    {
+                        <option value="@type.ToString()" selected="@(_newType == type)">@TypeLabel(type)</option>
+                    }
+                </select>
+            </label>
+
+            <button type="button" class="ui-btn-primary !h-9 !px-4 text-[13px] disabled:opacity-50"
+                    disabled="@_busy"
+                    @onclick="AddAsync">
+                Add column
+            </button>
+
+            <button type="button"
+                    class="ml-auto rounded-control border border-line-strong bg-surface px-3 py-1.5 text-[12px] font-medium text-ink transition hover:border-brand hover:text-brand disabled:opacity-50"
+                    disabled="@(_busy || _columns.Count == 0)"
+                    @onclick="CopyAsync">
+                Copy any missing columns from this board
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly ColumnType[] Types =
+    [
+        ColumnType.Text,
+        ColumnType.LongText,
+        ColumnType.Number,
+        ColumnType.Status,
+        ColumnType.Date,
+        ColumnType.Checkbox,
+        ColumnType.People,
+        ColumnType.Dropdown
+    ];
+
+    [Parameter, EditorRequired]
+    public Guid BoardId { get; set; }
+
+    [Parameter]
+    public bool CanEdit { get; set; }
+
+    private readonly List<ColumnView> _columns = [];
+    private string _newTitle = string.Empty;
+    private ColumnType _newType = ColumnType.Text;
+    private Guid? _confirming;
+    private string? _error;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Bootstrapper.EnsureResolvedAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var columns = await Columns.ListAsync(BoardId);
+
+        _columns.Clear();
+        _columns.AddRange(columns);
+    }
+
+    private async Task AddAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        _busy = true;
+
+        try
+        {
+            var result = await Columns.AddAsync(BoardId, _newTitle, _newType);
+
+            if (!result.Succeeded)
+            {
+                _error = result.Error;
+                return;
+            }
+
+            _error = null;
+            _newTitle = string.Empty;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RenameAsync(Guid columnId, string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            await LoadAsync();
+            return;
+        }
+
+        var result = await Columns.RenameAsync(columnId, title);
+
+        _error = result.Succeeded ? null : result.Error;
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(Guid columnId)
+    {
+        _busy = true;
+
+        try
+        {
+            var result = await Columns.DeleteAsync(columnId);
+
+            _error = result.Succeeded ? null : result.Error;
+            _confirming = null;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task MoveAsync(Guid columnId, int delta)
+    {
+        _busy = true;
+
+        try
+        {
+            var result = await Columns.MoveAsync(columnId, delta);
+
+            _error = result.Succeeded ? null : result.Error;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CopyAsync()
+    {
+        _busy = true;
+
+        try
+        {
+            var result = await Editor.CopyParentColumnsAsync(BoardId);
+
+            _error = result.Succeeded ? null : result.Error;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static ColumnType ParseType(string? value) =>
+        Enum.TryParse<ColumnType>(value, ignoreCase: true, out var parsed) ? parsed : ColumnType.Text;
+
+    private static string TypeLabel(ColumnType type) => type switch
+    {
+        ColumnType.LongText => "Long text",
+        ColumnType.Status => "Status",
+        ColumnType.Date => "Date",
+        ColumnType.Checkbox => "Checkbox",
+        ColumnType.People => "People",
+        ColumnType.Dropdown => "Dropdown",
+        ColumnType.Number => "Number",
+        _ => "Text"
+    };
+}
