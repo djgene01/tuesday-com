@@ -1,5 +1,5 @@
 /* Self-hosted type. Poppins carries display headings, Figtree carries the UI and the
-   data grid — monday.com's pairing, without a CDN round trip or a third-party request. */
+   data grid — the reference pairing, without a CDN round trip or a third-party request. */
 
 @font-face {
   font-family: "Poppins";

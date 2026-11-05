@@ -72,6 +72,18 @@ jobs:
       - name: Test
         run: dotnet test Tuesday.slnx --configuration Release --no-build --logger "trx;LogFileName=results.trx"
 
+      - name: Clean-room scan
+        run: bash scripts/clean-room/scan.sh
+
+      - name: SBOM and reviewed dependency allowlist
+        run: python3 scripts/sbom/generate.py --check
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: artifacts/sbom.cdx.json
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

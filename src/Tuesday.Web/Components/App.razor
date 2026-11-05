@@ -1,4 +1,7 @@
-﻿<!DOCTYPE html>
+@using Microsoft.AspNetCore.Http
+@inject IHttpContextAccessor Http
+
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -14,7 +17,7 @@
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["css/tailwind.css"]" />
     <link rel="stylesheet" href="@Assets["Tuesday.Web.styles.css"]" />
-    <ImportMap />
+    <ImportMap Nonce="@Nonce" />
     <HeadOutlet />
 </head>
 
@@ -24,7 +27,14 @@
        data-enhance-nav="false", which stops Blazor rejecting a form it does not own. *@
     <Routes />
     <ReconnectModal />
-    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    @* The nonce must be on the bootstrap tag: Blazor reuses it for the scripts it injects
+       at circuit start, and the CSP header only allows that nonce plus same-origin files. *@
+    <script src="@Assets["_framework/blazor.web.js"]" nonce="@Nonce"></script>
 </body>
 
 </html>
+
+@code {
+    private string Nonce => Http.HttpContext?.Items[Tuesday.Web.Security.SecurityHeadersMiddleware.NonceItemKey] as string ?? string.Empty;
+}
+

@@ -281,10 +281,10 @@ This is **0.9.0**, a release candidate. The honest limit list is in
 | Identity, TOTP, OAuth 2.0 token server, API tokens | ✅ shipped |
 | Dashboard, health, logging, security headers, container | ✅ shipped |
 | Sub-items | ✅ inline expander, own column set with its own editor |
-| Drag reorder in the table grid | ⏳ planned |
+| Drag reorder in the table grid | ✅ pointer drag and Alt+Arrow, including sub-item panels |
 | Performance checkpoints | ✅ 5k: p95 136 ms · 100k: p95 1.77 s (`scripts/perf`) |
 | Cursor pagination, idempotency keys, SSRF guard, webhook retries | ✅ shipped |
-| Script/style CSP, SBOM, backup and restore rehearsal | ⏳ planned |
+| Nonce-based CSP, CycloneDX SBOM with reviewed allowlist, backup/restore drill | ✅ shipped |
 
 ---
 

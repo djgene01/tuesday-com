@@ -98,7 +98,11 @@ proxy.
 - **The container could not run in Production.** OpenIddict had no signing key outside
   Development; it now fails at start-up with an actionable message instead of 500-ing per request.
 - **The acceptance checklist over-claimed.** P6-3 to P6-14 were ticked without evidence and have
-  been reset to their true state.
+  been reset to their true state. What is now real: a restore rehearsal with row counts
+  (`scripts/ops/backup-restore.sh`), an enforced nonce CSP checked in a browser and pinned by
+  tests, a CycloneDX SBOM with a reviewed dependency allowlist, and a clean-room scan that runs
+  in CI. Still unproven: the 200-user soak, a second replica with a shared key ring, and an
+  operator-run restore drill.
 - **Every unknown URL returned a 404 with an empty body**, so browsers replaced it with their own
   error screen. `UseStatusCodePagesWithReExecute` never fired (Blazor answers an unmatched route
   with `Content-Length: 0`, which the middleware treats as already handled), and a 4xx status set
