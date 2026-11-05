@@ -285,7 +285,7 @@ This is **0.9.0**, a release candidate. The honest limit list is in
 | Performance checkpoints | ✅ 5k: p95 136 ms · 100k: p95 1.77 s (`scripts/perf`) |
 | Cursor pagination, idempotency keys, SSRF guard, webhook retries | ✅ shipped |
 | Nonce-based CSP, CycloneDX SBOM with reviewed allowlist, backup/restore drill | ✅ shipped |
-| Two replicas behind nginx, shared Data Protection key ring, no sign-outs | ✅ shipped (`docker/compose.replicas.yaml`) |
+| Two replicas behind nginx, shared key ring, Redis realtime fan-out | ✅ shipped (`docker/compose.replicas.yaml`) |
 
 ---
 

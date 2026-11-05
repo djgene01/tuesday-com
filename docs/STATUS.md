@@ -22,7 +22,7 @@ Phases **P0–P6** are implemented; each was verified against live PostgreSQL 17
 | P3 | Kanban, calendar, timeline, gantt | core done — see gaps below |
 | P4 | Collaboration | done — see gaps below |
 | P5 | Automations, webhooks, public API | core done — see gaps below |
-| P6 | Dashboards, hardening, on-prem release | two replicas share a key ring; realtime is still per-replica — see gaps below |
+| P6 | Dashboards, hardening, on-prem release | two replicas share a key ring and realtime fan-out — see gaps below |
 
 ### Data store: PostgreSQL (decided)
 

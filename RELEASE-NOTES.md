@@ -59,10 +59,11 @@ Stated plainly because they are real. Each maps to an open item in
 10. **Operator runbooks are incomplete.** Only the signing-certificate runbook exists
     (`docs/runbooks/`). Restore, session revocation, replica drain, automation disable and
     disk recovery are not written.
-11. **Multi-instance is real but realtime is not.** Two replicas share a key ring in the
-    database, so sessions, antiforgery tokens and API quotas cross replicas. `BoardBroadcaster`
-    is still an in-process singleton: an update posted on one replica does not reach a circuit
-    held by the other, so a Redis backplane remains outstanding.
+11. **Multi-instance is real, realtime is best-effort.** Two replicas share a key ring in the
+    database, so sessions, antiforgery tokens and API quotas cross replicas, and a Redis backplane
+    plus the `tuesday:updates` relay carries updates and hub messages between them. Redis is not a
+    durable queue: if it is unreachable the write still succeeds locally and only the cross-replica
+    hop is lost.
 12. **API hardening is partial.** Cursor pagination, `Idempotency-Key`, a per-token daily quota,
     an SSRF guard and webhook retry/auto-disable are shipped and tested. Still missing: OpenAPI
     coverage is a single document snapshot rather than per-endpoint contract tests, the webhook

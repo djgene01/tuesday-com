@@ -11,6 +11,10 @@ Microsoft.AspNetCore.Cryptography.KeyDerivation
 Microsoft.AspNetCore.Identity.EntityFrameworkCore
 Microsoft.AspNetCore.Mvc.Testing
 Microsoft.AspNetCore.OpenApi
+Microsoft.AspNetCore.SignalR.StackExchangeRedis
+MessagePack
+MessagePack.Annotations
+Microsoft.NET.StringTools
 Microsoft.AspNetCore.TestHost
 Microsoft.Build.Framework
 Microsoft.CodeAnalysis.Analyzers

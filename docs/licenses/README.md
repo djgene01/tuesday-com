@@ -20,7 +20,7 @@ licence when a package is added.
 | `OpenTelemetry.*` | Apache-2.0 | telemetry (shipped by the ASP.NET defaults) |
 | `Polly*` | BSD-3-Clause | resilience |
 | `xunit*` | Apache-2.0 | test-only |
-| `AngleSharp`, `HtmlSanitizer`, `Humanizer`, `Newtonsoft.Json`, `StackExchange.Redis`, `RESPite`, `coverlet.collector`, `Mono.TextTemplating` | MIT | |
+| `AngleSharp`, `HtmlSanitizer`, `Humanizer`, `Newtonsoft.Json`, `StackExchange.Redis`, `RESPite`, `coverlet.collector`, `Mono.TextTemplating`, `MessagePack`, `Microsoft.NET.StringTools` | MIT | MessagePack arrives transitively with the SignalR Redis backplane |
 
 No package in the graph is copyleft. Nothing here is redistributed as source; the container
 ships compiled assemblies plus their licence files.

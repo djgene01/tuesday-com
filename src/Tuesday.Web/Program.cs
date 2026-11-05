@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.DataProtection;
+using StackExchange.Redis;
 using Tuesday.Infrastructure.Security;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
@@ -46,11 +47,17 @@ builder.Services.AddDataProtection()
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddSignalR();
+// The SignalR backplane carries hub messages between replicas; the relay below carries the
+// Blazor-circuit event, which never leaves the process it was raised in.
+builder.Services.AddSignalR()
+    .AddStackExchangeRedis(
+        builder.Configuration["Redis:Configuration"] ?? "127.0.0.1:6379",
+        options => options.Configuration.ChannelPrefix = RedisChannel.Literal("tuesday:signalr"));
 builder.Services.AddSingleton<Tuesday.Web.Collaboration.BoardBroadcaster>();
 builder.Services.AddSingleton<Tuesday.Application.Collaboration.IUpdateBroadcaster>(
     provider => provider.GetRequiredService<Tuesday.Web.Collaboration.BoardBroadcaster>());
 builder.Services.AddSingleton<Tuesday.Web.Collaboration.AttachmentLinks>();
+builder.Services.AddHostedService<Tuesday.Web.Collaboration.UpdateBroadcastRelay>();
 
 // A fixed name matters behind a load balancer: the default name embeds a per-instance
 // discriminator, so a form rendered by one replica is rejected by another even though the

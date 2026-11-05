@@ -174,6 +174,7 @@ Each phase section ends with a **user validation gate**: a person, not a test, c
 | P6-3 ☑ | **Backup taken and restored into a scratch environment** | **yes** | `scripts/ops/backup-restore.sh`: 168 KB dump restored into a scratch DB; 9 tables compared row-for-row, all matched; scratch dropped |
 | P6-4 ◐ | **Rollback rehearsed**: deploy N+1, roll back to N, sign-in and write work | **partial** | replica restart under traffic keeps sessions (ring lives in the database); rolling back to an image **older than 0.9.1** still signs users out, because that build has no shared ring |
 | P6-5 ☑ | Second web replica added with shared key ring and affinity; no sign-outs | **yes** | `docker/compose.replicas.yaml`: key ring in `data_protection_keys`, fixed antiforgery cookie, `ip_hash` upstream. Proven: session from A accepted by B; login token from A posted to B; A stopped, B still served the session |
+| P6-15 ☑ | Realtime updates reach circuits on other replicas | **yes** | SignalR Redis backplane + `tuesday:updates` channel read by `UpdateBroadcastRelay`; an API post on replica A appeared in an item thread open on replica B with no reload |
 | P6-6 ☑ | WebSocket upgrade verified at the proxy | **yes** | nginx 1.29 with `Upgrade`/`Connection` mapping and 3600 s read timeout; sub-item panel expanded through `:8081` with the circuit live |
 | P6-7 ☐ | Perf targets met at 200 users, 5k-item board | **no — never measured** | — |
 | P6-8 ○ | axe clean (no serious/critical) on all primary routes | **no** | — |
