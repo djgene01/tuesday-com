@@ -133,7 +133,8 @@ public sealed class AutomationService(
         AutomationTrigger trigger,
         Guid? changedColumnId = null,
         string? changedValue = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int depth = 0)
     {
         await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
@@ -180,6 +181,19 @@ public sealed class AutomationService(
 
         var executed = 0;
 
+        var automationIds = automations.Select(automation => automation.Id).ToList();
+
+        var stepsByAutomation = (await dbContext.AutomationSteps.AsNoTracking()
+                .Where(step => automationIds.Contains(step.AutomationId))
+                .OrderBy(step => step.Position)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false))
+            .GroupBy(step => step.AutomationId)
+            .ToDictionary(group => group.Key, group => group.ToList());
+
+        Guid? chainColumnId = null;
+        string? chainValue = null;
+
         foreach (var automation in automations)
         {
             if (!automation.Matches(columnValues))
@@ -189,40 +203,111 @@ public sealed class AutomationService(
                 continue;
             }
 
-            try
+            var steps = stepsByAutomation.TryGetValue(automation.Id, out var stored) && stored.Count > 0
+                ? stored.Select(step => (Action: step.Action, Value: step.ActionValue)).ToList()
+                : [(automation.Action, automation.ActionValue)];
+
+            var messages = new List<string>();
+            var failures = 0;
+            Guid? writtenColumnId = null;
+            string? writtenValue = null;
+
+            foreach (var (action, value) in steps)
             {
-                var message = await ExecuteAsync(dbContext, automation, item.TenantId, itemId, cancellationToken)
-                    .ConfigureAwait(false);
+                try
+                {
+                    var outcome = await ExecuteAsync(dbContext, automation, action, value, item.TenantId, itemId, cancellationToken)
+                        .ConfigureAwait(false);
 
-                dbContext.AutomationRuns.Add(AutomationRun.Create(
-                    item.TenantId, automation.Id, itemId, AutomationRunStatus.Succeeded, message));
+                    messages.Add(outcome.Message);
 
+                    // The last write is the one that can start a chain; earlier writes have already
+                    // been observed by whoever asked for the change.
+                    if (outcome.WrittenColumnId is { } wroteColumn)
+                    {
+                        writtenColumnId = wroteColumn;
+                        writtenValue = outcome.WrittenValue;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    // A failing action is recorded and the next one still runs: a rule that sets a
+                    // status and then posts an update should still post when the status write is
+                    // refused.
+                    failures++;
+                    messages.Add($"Failed: {exception.Message}");
+                }
+            }
+
+            var status = failures == 0 ? AutomationRunStatus.Succeeded : AutomationRunStatus.Failed;
+
+            dbContext.AutomationRuns.Add(AutomationRun.Create(
+                item.TenantId, automation.Id, itemId, status, string.Join(" ", messages)));
+
+            if (failures == 0)
+            {
                 executed++;
             }
-            catch (Exception exception)
+
+            if (writtenColumnId is { } wrote)
             {
-                dbContext.AutomationRuns.Add(AutomationRun.Create(
-                    item.TenantId, automation.Id, itemId, AutomationRunStatus.Failed, exception.Message));
+                chainColumnId = wrote;
+                chainValue = writtenValue;
             }
         }
 
         await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        if (chainColumnId is { } downstreamColumn)
+        {
+            if (depth + 1 >= Automation.MaxChainDepth)
+            {
+                // Stop at three hops and leave a record. Without this a rule that flips a status
+                // back and forth fires forever inside one request.
+                foreach (var automation in automations)
+                {
+                    dbContext.AutomationRuns.Add(AutomationRun.Create(
+                        item.TenantId,
+                        automation.Id,
+                        itemId,
+                        AutomationRunStatus.LoopPrevented,
+                        $"Chain depth {Automation.MaxChainDepth} reached; this write did not fire another rule."));
+                }
+
+                await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await FireAsync(
+                        boardId,
+                        itemId,
+                        AutomationTrigger.CellChanged,
+                        downstreamColumn,
+                        chainValue,
+                        cancellationToken,
+                        depth + 1)
+                    .ConfigureAwait(false);
+            }
+        }
+
         return executed;
     }
 
-    private async Task<string> ExecuteAsync(
+    private async Task<(string Message, Guid? WrittenColumnId, string? WrittenValue)> ExecuteAsync(
         TuesdayDbContext dbContext,
         Automation automation,
+        AutomationAction action,
+        string actionValue,
         Guid tenantId,
         Guid itemId,
         CancellationToken cancellationToken)
     {
-        switch (automation.Action)
+        switch (action)
         {
             case AutomationAction.SetStatus:
             {
                 // "status=Done": the column is named on the left, the value written on the right.
-                var parts = automation.ActionValue.Split('=', 2);
+                var parts = actionValue.Split('=', 2);
 
                 if (parts.Length != 2 || string.IsNullOrWhiteSpace(parts[0]) || string.IsNullOrWhiteSpace(parts[1]))
                 {
@@ -245,17 +330,17 @@ public sealed class AutomationService(
                     throw new InvalidOperationException(write.Error ?? "The status write was refused.");
                 }
 
-                return $"Set {column.Title} to '{parts[1].Trim()}'.";
+                return ($"Set {column.Title} to '{parts[1].Trim()}'.", column.Id, parts[1].Trim());
             }
 
             case AutomationAction.SetDate:
             {
-                var column = await FindColumnAsync(dbContext, automation.BoardId, automation.ActionValue, cancellationToken)
+                var column = await FindColumnAsync(dbContext, automation.BoardId, actionValue, cancellationToken)
                     .ConfigureAwait(false);
 
                 if (column is null)
                 {
-                    throw new InvalidOperationException($"No date column with key '{automation.ActionValue}'.");
+                    throw new InvalidOperationException($"No date column with key '{actionValue}'.");
                 }
 
                 var today = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd");
@@ -266,7 +351,7 @@ public sealed class AutomationService(
                     throw new InvalidOperationException(write.Error ?? "The date write was refused.");
                 }
 
-                return $"Set {column.Title} to {today}.";
+                return ($"Set {column.Title} to {today}.", column.Id, today);
             }
 
             case AutomationAction.NotifyOwner:
@@ -286,7 +371,7 @@ public sealed class AutomationService(
 
                 if (userId is null)
                 {
-                    return "No owner to notify.";
+                    return ("No owner to notify.", null, null);
                 }
 
                 await notifications.NotifyAsync(
@@ -294,14 +379,14 @@ public sealed class AutomationService(
                         userId.Value,
                         Tuesday.Domain.Collaboration.NotificationKind.Automation,
                         automation.Name,
-                        automation.ActionValue,
+                        actionValue,
                         $"/board/{automation.BoardId:D}/item/{itemId:D}",
                         automation.BoardId,
                         itemId,
                         cancellationToken)
                     .ConfigureAwait(false);
 
-                return $"Notified {owner}.";
+                return ($"Notified {owner}.", null, null);
             }
 
             case AutomationAction.PostUpdate:
@@ -312,17 +397,17 @@ public sealed class AutomationService(
                         itemId,
                         Guid.Empty,
                         automation.CreatedBy,
-                        automation.ActionValue,
+                        actionValue,
                         isReply: false,
                         threadRootId: null,
                         cancellationToken)
                     .ConfigureAwait(false);
 
-                return "Delivered the configured message.";
+                return ("Posted the configured update.", null, null);
             }
 
             default:
-                throw new NotSupportedException($"Action {automation.Action} has no executor.");
+                throw new NotSupportedException($"Action {action} has no executor.");
         }
     }
 

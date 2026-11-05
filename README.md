@@ -31,7 +31,7 @@ underlying items, and the whole thing is scriptable.
 
 It is not a mockup or a scaffold. It runs: cookie sign-in with a TOTP second factor, an OAuth 2.0
 token server, tenant-isolated data access, 500-item boards that virtualise, real-time collaboration
-over SignalR, a trigger→condition→action automation engine, HMAC-signed webhooks, and a Docker image
+over SignalR, a trigger→condition→ordered-action automation engine with a depth-3 loop guard, HMAC-signed webhooks, and a Docker image
 that runs non-root in production.
 
 **Why it exists.** Most work-management tools are closed products you rent. This one is a

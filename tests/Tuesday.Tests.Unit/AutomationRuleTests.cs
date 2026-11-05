@@ -22,6 +22,47 @@ public sealed class AutomationRuleTests
         Guid.CreateVersion7());
 
     [Fact]
+    public void A_rule_keeps_its_actions_in_order()
+    {
+        var rule = Automation.Create(
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            "chain",
+            AutomationTrigger.CellChanged,
+            null,
+            [
+                (AutomationAction.SetStatus, "status=Done"),
+                (AutomationAction.PostUpdate, "Shipped it."),
+                (AutomationAction.NotifyOwner, "Done")
+            ],
+            Guid.CreateVersion7());
+
+        Assert.Equal([0, 1, 2], rule.Steps.Select(step => step.Position));
+        Assert.Equal([AutomationAction.SetStatus, AutomationAction.PostUpdate, AutomationAction.NotifyOwner],
+            rule.Steps.Select(step => step.Action));
+
+        // The first action is mirrored on the rule so older readers still see one.
+        Assert.Equal(AutomationAction.SetStatus, rule.Action);
+        Assert.Equal("status=Done", rule.ActionValue);
+    }
+
+    [Fact]
+    public void A_rule_refuses_an_empty_chain_or_more_than_ten_actions()
+    {
+        Assert.Throws<ArgumentException>(() => Automation.Create(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), "empty", AutomationTrigger.CellChanged, null,
+            Array.Empty<(AutomationAction, string)>(), Guid.CreateVersion7()));
+
+        var tooMany = Enumerable.Range(0, Automation.MaxSteps + 1)
+            .Select(_ => (AutomationAction.PostUpdate, "x"))
+            .ToArray();
+
+        Assert.Throws<ArgumentException>(() => Automation.Create(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), "long", AutomationTrigger.CellChanged, null,
+            tooMany, Guid.CreateVersion7()));
+    }
+
+    [Fact]
     public void EmptyCondition_AlwaysMatches()
     {
         Assert.True(Rule("").Matches(Values(("status", "Done"))));

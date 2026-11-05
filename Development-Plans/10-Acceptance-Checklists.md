@@ -142,9 +142,9 @@ Each phase section ends with a **user validation gate**: a person, not a test, c
 | # | Check | Evidence |
 |---|---|---|
 | P5-1 ☑ | Recipe create/edit/enable/disable/delete with the documented lifecycle [S6] | E2E |
-| P5-2 ◐ | Multi-action chain executes in order [S6] | one action per rule; chains not modelled |
-| P5-3 ◐ | One failing action does not stop the next | depends on P5-2; a failed action is logged as `Failed` and does not roll back |
-| P5-4 ☐ | Loop guard stops at depth 3 and logs `LoopPrevented` | not needed yet and not built: automations do not trigger other automations |
+| P5-2 ☑ | Multi-action chain executes in order [S6] | **yes** | `automation_steps` (up to 10, dense positions); a 3-step rule ran `Set Status → Post update → Notify owner` in that order, run message lists all three |
+| P5-3 ☑ | One failing action does not stop the next | **yes** | step 1 pointed at a missing column (`missing_column=Done`), step 2 still posted; run recorded `Failed: No column with key 'missing_column'. Posted the configured update.` |
+| P5-4 ☑ | Loop guard stops at depth 3 and logs `LoopPrevented` | **yes** | a Done↔Stuck pair ran three hops, then both rules recorded `LoopPrevented` and no further write fired. `Automation.MaxChainDepth = 3` |
 | P5-5 ☐ | Quota metering refuses over-limit execution [S1] | not built; the API quota (P5-12) is unrelated |
 | P5-6 ☐ | Scheduled trigger fires once in a Quartz cluster of two workers | Quartz never adopted; the worker is a single instance with no cluster test |
 | P5-7 ◐ | Date-arrival trigger fires at the tenant-local boundary (Q3) | daily sweep exists; the boundary is UTC, not tenant-local |

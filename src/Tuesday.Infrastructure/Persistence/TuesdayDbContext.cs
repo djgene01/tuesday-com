@@ -69,6 +69,8 @@ public sealed class TuesdayDbContext(
 
     public DbSet<AutomationRun> AutomationRuns => Set<AutomationRun>();
 
+    public DbSet<Tuesday.Domain.Automation.AutomationStep> AutomationSteps => Set<Tuesday.Domain.Automation.AutomationStep>();
+
     public DbSet<Webhook> Webhooks => Set<Webhook>();
 
     public DbSet<ApiToken> ApiTokens => Set<ApiToken>();
@@ -346,6 +348,18 @@ public sealed class TuesdayDbContext(
             entity.Property(x => x.Condition).HasMaxLength(500);
             entity.Property(x => x.ActionValue).HasMaxLength(500);
             entity.HasIndex(x => new { x.BoardId, x.Trigger, x.Enabled });
+            entity.HasMany(x => x.Steps)
+                .WithOne()
+                .HasForeignKey(step => step.AutomationId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<Tuesday.Domain.Automation.AutomationStep>(entity =>
+        {
+            entity.ToTable("automation_steps");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ActionValue).HasMaxLength(500).IsRequired();
+            entity.HasIndex(x => new { x.AutomationId, x.Position }).IsUnique();
         });
 
         builder.Entity<AutomationRun>(entity =>

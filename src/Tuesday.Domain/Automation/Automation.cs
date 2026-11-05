@@ -33,6 +33,15 @@ public sealed class Automation : ITenantOwned
 {
     public const int MaxPerBoard = 200;
 
+    /// <summary>A rule is a short ordered list of actions, not a workflow engine.</summary>
+    public const int MaxSteps = 10;
+
+    /// <summary>
+    /// A chain may rewrite values that fire another rule. Three hops is the documented ceiling:
+    /// deeper chains are almost always a mistake, and an unbounded one is an outage.
+    /// </summary>
+    public const int MaxChainDepth = 3;
+
     private Automation()
     {
     }
@@ -61,6 +70,9 @@ public sealed class Automation : ITenantOwned
 
     public DateTimeOffset CreatedAt { get; private set; }
 
+    /// <summary>Ordered actions. Position starts at 0 and is dense.</summary>
+    public List<AutomationStep> Steps { get; } = [];
+
     public static Automation Create(
         Guid tenantId,
         Guid boardId,
@@ -69,12 +81,36 @@ public sealed class Automation : ITenantOwned
         string? condition,
         AutomationAction action,
         string? actionValue,
+        Guid createdBy) =>
+        Create(tenantId, boardId, name, trigger, condition, [(action, actionValue ?? string.Empty)], createdBy);
+
+    public static Automation Create(
+        Guid tenantId,
+        Guid boardId,
+        string name,
+        AutomationTrigger trigger,
+        string? condition,
+        IReadOnlyList<(AutomationAction Action, string Value)> steps,
         Guid createdBy)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentException.ThrowIfNullOrWhiteSpace(actionValue);
 
-        return new Automation
+        if (steps.Count is 0)
+        {
+            throw new ArgumentException("An automation needs at least one action.", nameof(steps));
+        }
+
+        if (steps.Count > MaxSteps)
+        {
+            throw new ArgumentException($"An automation can run at most {MaxSteps} actions.", nameof(steps));
+        }
+
+        if (steps.Any(step => string.IsNullOrWhiteSpace(step.Value)))
+        {
+            throw new ArgumentException("Every action needs a value.", nameof(steps));
+        }
+
+        var automation = new Automation
         {
             Id = Guid.CreateVersion7(),
             TenantId = tenantId,
@@ -82,11 +118,19 @@ public sealed class Automation : ITenantOwned
             Name = name.Length > 200 ? name[..200] : name,
             Trigger = trigger,
             Condition = condition?.Trim() ?? string.Empty,
-            Action = action,
-            ActionValue = actionValue,
+            Action = steps[0].Action,
+            ActionValue = steps[0].Value,
             CreatedBy = createdBy,
             CreatedAt = DateTimeOffset.UtcNow
         };
+
+        for (var position = 0; position < steps.Count; position++)
+        {
+            automation.Steps.Add(AutomationStep.Create(
+                tenantId, automation.Id, position, steps[position].Action, steps[position].Value));
+        }
+
+        return automation;
     }
 
     public void SetEnabled(bool enabled) => Enabled = enabled;
@@ -139,11 +183,50 @@ public sealed class Automation : ITenantOwned
     }
 }
 
+
+/// <summary>One ordered action inside an automation.</summary>
+public sealed class AutomationStep : ITenantOwned
+{
+    private AutomationStep()
+    {
+    }
+
+    public Guid Id { get; private set; }
+
+    public Guid TenantId { get; private set; }
+
+    public Guid AutomationId { get; private set; }
+
+    public int Position { get; private set; }
+
+    public AutomationAction Action { get; private set; }
+
+    public string ActionValue { get; private set; } = string.Empty;
+
+    internal static AutomationStep Create(
+        Guid tenantId,
+        Guid automationId,
+        int position,
+        AutomationAction action,
+        string value) => new()
+    {
+        Id = Guid.CreateVersion7(),
+        TenantId = tenantId,
+        AutomationId = automationId,
+        Position = position,
+        Action = action,
+        ActionValue = value
+    };
+}
+
 public enum AutomationRunStatus
 {
     Succeeded = 1,
     Skipped = 2,
-    Failed = 3
+    Failed = 3,
+
+    /// <summary>A rewrite tried to fire another rule past <see cref="Automation.MaxChainDepth"/>.</summary>
+    LoopPrevented = 4
 }
 
 /// <summary>One execution attempt, kept so an operator can answer "why did that happen?".</summary>

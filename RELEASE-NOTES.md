@@ -18,7 +18,7 @@ API — and deliberately unproven on operational load. Read "Known limitations" 
 | Boards | Groups, columns, 500-item grids, inline edit, attachments, item detail |
 | Views | Kanban, calendar, timeline, Gantt |
 | Collaboration | Threaded updates with HTML sanitisation, likes, reply/edit/delete, notifications, email preference, in-app search |
-| Automations | Trigger → condition → action rules; scheduled date-passed sweep with per-item-per-day dedupe |
+| Automations | ordered multi-action chains, depth-3 loop guard | Trigger → condition → action rules; scheduled date-passed sweep with per-item-per-day dedupe |
 | Integrations | Signed webhooks with challenge handshake, REST API with cursor pagination, idempotency keys, per-token quota and a committed OpenAPI snapshot |
 | Dashboard | Per-board counts, by-status and by-group breakdown, automation run history |
 | Ops | `/health/live`, `/health/ready`, correlation ids, security headers, Docker image, Compose stack |

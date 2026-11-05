@@ -529,6 +529,37 @@ namespace Tuesday.Infrastructure.Persistence.Migrations
                     b.ToTable("automation_runs", (string)null);
                 });
 
+            modelBuilder.Entity("Tuesday.Domain.Automation.AutomationStep", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Action")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ActionValue")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("AutomationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AutomationId", "Position")
+                        .IsUnique();
+
+                    b.ToTable("automation_steps", (string)null);
+                });
+
             modelBuilder.Entity("Tuesday.Domain.Automation.IdempotencyRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1430,6 +1461,15 @@ namespace Tuesday.Infrastructure.Persistence.Migrations
                     b.Navigation("Authorization");
                 });
 
+            modelBuilder.Entity("Tuesday.Domain.Automation.AutomationStep", b =>
+                {
+                    b.HasOne("Tuesday.Domain.Automation.Automation", null)
+                        .WithMany("Steps")
+                        .HasForeignKey("AutomationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreApplication", b =>
                 {
                     b.Navigation("Authorizations");
@@ -1440,6 +1480,11 @@ namespace Tuesday.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreAuthorization", b =>
                 {
                     b.Navigation("Tokens");
+                });
+
+            modelBuilder.Entity("Tuesday.Domain.Automation.Automation", b =>
+                {
+                    b.Navigation("Steps");
                 });
 #pragma warning restore 612, 618
         }
