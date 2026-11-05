@@ -23,21 +23,24 @@
 @source "../Components/**/*.cs";
 
 @theme {
-  /* Brand */
-  /* 4.2:1 at 12px on the canvas was below AA; this hue measures 5.4 on canvas and 5.8 under white. */
-  --color-brand: #5252e0;
-  --color-brand-hover: #5151d5;
-  --color-brand-press: #4747bb;
-  --color-brand-tint: #ececff;
-  --color-brand-ink: #3b3bbd;
+  /* Brand — Digital Wellness: peach carries fills behind ink text, a deeper coral carries text.
+     Peach on the canvas is 1.6:1, so it is never used for words; the coral measures 5.0:1. */
+  --color-brand: #a8554e;
+  --color-brand-hover: #9e4b45;
+  --color-brand-press: #8f423c;
+  --color-brand-tint: #ffb7b2;
+  --color-brand-ink: #7a3b35;
+  --color-peach: #ffb7b2;
+  --color-sage: #e8efe8;
+  --color-lavender: #efedf4;
 
   /* Neutrals — monday's in-product greys */
-  --color-ink: #323338;
-  --color-ink-soft: #676879;
-  --color-ink-faint: #6b6f80;
-  --color-line: #e6e9ef;
-  --color-line-strong: #d0d4e4;
-  --color-canvas: #f6f7fb;
+  --color-ink: #292524;
+  --color-ink-soft: #78716c;
+  --color-ink-faint: #78716c;
+  --color-line: #e7e5e4;
+  --color-line-strong: #d6d3d1;
+  --color-canvas: #fdfcf8;
   --color-surface: #ffffff;
 
   /* Status palette */
@@ -49,16 +52,16 @@
   --color-status-info: #579bfc;
 
   /* Type */
-  --font-display: "Poppins", "Segoe UI", system-ui, sans-serif;
-  --font-sans: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: "Outfit", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Outfit", "Segoe UI", system-ui, -apple-system, sans-serif;
 
   /* Shape */
   --radius-pill: 999px;
-  --radius-card: 10px;
-  --radius-control: 6px;
+  --radius-card: 2rem;
+  --radius-control: 12px;
 
-  --shadow-card: 0 4px 12px rgb(29 33 57 / 0.08);
-  --shadow-pop: 0 12px 32px rgb(29 33 57 / 0.16);
+  --shadow-card: 0 4px 20px -2px rgb(0 0 0 / 0.05);
+  --shadow-pop: 0 12px 40px -8px rgb(0 0 0 / 0.10);
 }
 
 /* --- Component layer: the pieces that repeat across boards ------------------------- */
@@ -73,7 +76,7 @@
   }
 
   .ui-btn-primary {
-    @apply bg-brand text-white hover:bg-brand-hover active:bg-brand-press;
+    @apply bg-brand-tint text-ink hover:brightness-95 active:brightness-90;
   }
 
   .ui-btn-ghost {
@@ -85,7 +88,7 @@
   }
 
   .ui-card {
-    @apply rounded-[10px] border border-line bg-surface;
+    @apply rounded-[2rem] border border-line bg-surface;
   }
 
   .ui-pill {

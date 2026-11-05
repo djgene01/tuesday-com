@@ -269,7 +269,7 @@
         </div>
     }
 
-    @if (_board is { } addable && addable.Groups.Count > 0)
+    @if (CanEdit && _board is { } addable && addable.Groups.Count > 0)
     {
         @* Without this a fresh board can never receive its first item: the empty state only
            describes the problem, and the seeded demo boards hid that. *@

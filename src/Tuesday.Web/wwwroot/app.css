@@ -1,23 +1,28 @@
-/* Tuesday.com design tokens.
-   The visual language follows the public reference UI: a violet primary, Poppins display type, Figtree
-   for UI and data, a soft grey canvas and a compact grid. Colours and layout only — no
-   logo, icon set or other protected asset is reproduced. */
+/* Tuesday.com design tokens — Digital Wellness.
+   Warm paper canvas, soft-black ink, sage and lavender surfaces, a peach accent behind dark text and
+   a deeper coral wherever the accent has to carry words (peach itself is 1.6:1 and never is).
+   Outfit for everything structural, Reenie Beanie for a human aside. Grain and motion are decoration
+   and are switched off under prefers-reduced-motion. */
 
 :root {
-  --tue-ink: #323338;
-  --tue-ink-soft: #676879;
-  --tue-line: #e6e9ef;
+  --tue-ink: #292524;
+  --tue-ink-soft: #78716c;
+  --tue-line: #e7e5e4;
   --tue-surface: #ffffff;
-  --tue-canvas: #f6f7fb;
-  --tue-accent: #5252e0;
-  --tue-accent-soft: #ececff;
+  --tue-canvas: #fdfcf8;
+  --tue-accent: #a8554e;
+  --tue-accent-soft: #ffb7b2;
+  --tue-sage: #e8efe8;
+  --tue-lavender: #efedf4;
+  --tue-peach: #ffb7b2;
+  --tue-radius-lg: 2rem;
   --tue-ok: #007a4d;
   --tue-ok-bg: #e7f6f0;
   --tue-warn: #8a4b00;
   --tue-warn-bg: #fdf3e3;
   --tue-bad: #b3243b;
   --tue-bad-bg: #fdeceb;
-  --tue-radius: 10px;
+  --tue-radius: 2rem;
   --tue-space: 1rem;
 }
 
@@ -28,18 +33,59 @@ html, body {
   padding: 0;
   background: var(--tue-canvas);
   color: var(--tue-ink);
-  font-family: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-family: "Outfit", "Segoe UI", system-ui, -apple-system, sans-serif;
   font-size: 16px;
   line-height: 1.55;
 }
 
-h1, h2 { font-family: "Poppins", "Figtree", system-ui, sans-serif; line-height: 1.15; margin: 0; letter-spacing: -0.02em; }
+h1, h2 { font-family: "Outfit", system-ui, sans-serif; line-height: 1.05; margin: 0; letter-spacing: -0.025em; font-weight: 500; }
+h1 { font-size: clamp(2.5rem, 6vw, 4.5rem); }
+h2 { font-size: clamp(1.75rem, 3.4vw, 2.5rem); }
+
+/* The hand-written aside. Decorative only: never the sole carrier of a fact. */
+.font-hand { font-family: "Reenie Beanie", "Segoe Script", cursive; letter-spacing: 0; font-weight: 400; }
 
 /* Blazor moves focus to the page heading after navigation. A heading is not a control, so it
    never paints a ring — for keyboard users the ring belongs on things they can operate. */
 h1:focus, h2:focus, h1:focus-visible, h2:focus-visible { outline: none; }
 
 a { color: var(--tue-accent); text-underline-offset: 3px; }
+
+/* Paper grain: one tiny inline SVG, tiled, never intercepting a pointer. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.45'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+}
+
+/* Reveal-on-scroll, opt-in per element. */
+.reveal { opacity: 0; transform: translateY(30px); transition: opacity .8s ease, transform .8s ease; }
+.reveal.is-visible { opacity: 1; transform: none; }
+
+/* Soft background blobs. */
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  animation: float 6s ease-in-out infinite;
+}
+@keyframes float {
+  0%, 100% { transform: translateY(-10px); }
+  50% { transform: translateY(10px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .blob { animation: none; }
+  body::after { display: none; }
+  html { scroll-behavior: auto; }
+}
 a:focus-visible, button:focus-visible { outline: 3px solid var(--tue-accent); outline-offset: 2px; }
 
 .shell {

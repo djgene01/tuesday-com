@@ -4,6 +4,7 @@ using Tuesday.Application.Tenancy;
 using Tuesday.Domain.Boards;
 using Tuesday.Domain.Items;
 using Tuesday.Infrastructure.Persistence;
+using Tuesday.Infrastructure.Tenancy;
 
 namespace Tuesday.Infrastructure.Boards;
 
@@ -28,6 +29,11 @@ public sealed class ItemEditor(
         if (tenant.TenantId is not { } tenantId)
         {
             return ItemWriteResult.Fail("No tenant is bound to this request.");
+        }
+
+        if (!WritePermission.Allows(tenant))
+        {
+            return ItemWriteResult.Fail(WritePermission.Denied);
         }
 
         if (string.IsNullOrWhiteSpace(name))
@@ -108,6 +114,11 @@ public sealed class ItemEditor(
             return ItemWriteResult.Fail("No tenant is bound to this request.");
         }
 
+        if (!WritePermission.Allows(tenant))
+        {
+            return ItemWriteResult.Fail(WritePermission.Denied);
+        }
+
         await using var dbContext = await contextFactory
             .CreateDbContextAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -168,6 +179,11 @@ public sealed class ItemEditor(
         int targetIndex,
         CancellationToken cancellationToken = default)
     {
+
+        if (!WritePermission.Allows(tenant))
+        {
+            return ItemWriteResult.Fail(WritePermission.Denied);
+        }
         await using var dbContext = await contextFactory
             .CreateDbContextAsync(cancellationToken)
             .ConfigureAwait(false);

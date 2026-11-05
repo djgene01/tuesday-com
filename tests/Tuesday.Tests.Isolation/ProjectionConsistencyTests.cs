@@ -15,13 +15,15 @@ namespace Tuesday.Tests.Isolation;
 /// </summary>
 public sealed class ProjectionConsistencyTests
 {
+    private ITenantContext _tenant = null!;
+
     private sealed class TestFactory(DbContextOptions<TuesdayDbContext> options, ITenantContext tenant)
         : IDbContextFactory<TuesdayDbContext>
     {
         public TuesdayDbContext CreateDbContext() => new(options, tenant);
     }
 
-    private static async Task<(TestFactory Factory, Guid ItemId, Dictionary<string, Guid> Columns)> SeedAsync()
+    private async Task<(TestFactory Factory, Guid ItemId, Dictionary<string, Guid> Columns)> SeedAsync()
     {
         var tenantContext = new TenantContext();
 
@@ -69,6 +71,7 @@ public sealed class ProjectionConsistencyTests
         await db.SaveChangesAsync();
 
         tenantContext.Resolve(tenant.Id, ownerId, TenantRole.Admin);
+        _tenant = tenantContext;
         return (factory, item.Id, columns);
     }
 
@@ -78,7 +81,7 @@ public sealed class ProjectionConsistencyTests
     public async Task Number_KeepsJsonAndProjectionInStep(string raw, string expectedText)
     {
         var (factory, itemId, columns) = await SeedAsync();
-        var writer = new ColumnValueWriter(factory);
+        var writer = new ColumnValueWriter(factory, _tenant);
 
         var result = await writer.SetAsync(itemId, columns["number"], raw);
         Assert.True(result.Succeeded, result.Error);
@@ -95,7 +98,7 @@ public sealed class ProjectionConsistencyTests
     public async Task Date_StoresIsoJsonAndDateProjection()
     {
         var (factory, itemId, columns) = await SeedAsync();
-        var writer = new ColumnValueWriter(factory);
+        var writer = new ColumnValueWriter(factory, _tenant);
 
         var result = await writer.SetAsync(itemId, columns["date"], "2026-11-03");
         Assert.True(result.Succeeded, result.Error);
@@ -112,7 +115,7 @@ public sealed class ProjectionConsistencyTests
     public async Task InvalidNumber_IsRejectedAndWritesNothing()
     {
         var (factory, itemId, columns) = await SeedAsync();
-        var writer = new ColumnValueWriter(factory);
+        var writer = new ColumnValueWriter(factory, _tenant);
 
         var result = await writer.SetAsync(itemId, columns["number"], "not a number");
 
@@ -127,7 +130,7 @@ public sealed class ProjectionConsistencyTests
     public async Task ClearingACell_RemovesEveryProjection()
     {
         var (factory, itemId, columns) = await SeedAsync();
-        var writer = new ColumnValueWriter(factory);
+        var writer = new ColumnValueWriter(factory, _tenant);
 
         Assert.True((await writer.SetAsync(itemId, columns["number"], "7")).Succeeded);
         Assert.True((await writer.SetAsync(itemId, columns["number"], "")).Succeeded);

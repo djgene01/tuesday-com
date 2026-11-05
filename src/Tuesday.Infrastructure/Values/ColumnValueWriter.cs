@@ -1,9 +1,11 @@
+using Tuesday.Application.Tenancy;
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Tuesday.Domain.Boards;
 using Tuesday.Domain.Items;
 using Tuesday.Infrastructure.Persistence;
+using Tuesday.Infrastructure.Tenancy;
 
 namespace Tuesday.Infrastructure.Values;
 
@@ -20,7 +22,9 @@ public sealed record ValueWriteResult(bool Succeeded, string? Error)
 /// Each call takes its own context: an interactive circuit may run two handlers at once,
 /// and one scoped DbContext cannot serve both.
 /// </summary>
-public sealed class ColumnValueWriter(IDbContextFactory<TuesdayDbContext> contextFactory)
+public sealed class ColumnValueWriter(
+    IDbContextFactory<TuesdayDbContext> contextFactory,
+    ITenantContext tenant)
 {
     public async Task<ValueWriteResult> SetAsync(
         Guid itemId,
@@ -28,6 +32,11 @@ public sealed class ColumnValueWriter(IDbContextFactory<TuesdayDbContext> contex
         string? rawValue,
         CancellationToken cancellationToken = default)
     {
+        if (!WritePermission.Allows(tenant))
+        {
+            return ValueWriteResult.Fail(WritePermission.Denied);
+        }
+
         await using var dbContext = await contextFactory
             .CreateDbContextAsync(cancellationToken)
             .ConfigureAwait(false);

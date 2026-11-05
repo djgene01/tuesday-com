@@ -1,7 +1,18 @@
-# Release notes — Tuesday.com 0.9.4 (release candidate)
+# Release notes — Tuesday.com 0.9.7 (release candidate)
 
 **Status:** release candidate for an internal work-tracking deployment. Not 1.0.
-**Date:** 2026-11-05 · **Version:** 0.9.4 · **Image tag:** `tuesday-web:0.9.4`
+**Date:** 2026-11-05 · **Version:** 0.9.7 · **Image tag:** `tuesday-web:0.9.7`
+
+Changes since 0.9.4:
+
+- **Digital Wellness visual language.** Warm paper canvas `#FDFCF8`, soft-black `#292524`, sage and
+  lavender surfaces, peach `#FFB7B2` behind dark text and a deeper coral `#A8554E` wherever the accent
+  has to carry words (peach is 1.6:1 — it is never used for text). Outfit for structure, Reenie
+  Beanie for a single hand-written aside, 2rem containers, `0 4px 20px -2px` shadows, a 35% fractal
+  grain overlay, reveal-on-scroll and floating blobs — all disabled under `prefers-reduced-motion`.
+- **Viewers can no longer write (P6-19).** The grid's add row was ungated and every service method
+  checked only tenant binding; role checks now live in `ItemEditor` and `ColumnValueWriter`.
+- axe remains clean on all twelve routes after the palette change.
 
 Changes since 0.9.3:
 
