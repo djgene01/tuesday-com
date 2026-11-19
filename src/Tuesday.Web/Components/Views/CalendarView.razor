@@ -5,75 +5,113 @@
 
 <div class="cal-toolbar">
     <div class="cal-nav">
-        <button type="button" class="btn-quiet" @onclick="() => StepAsync(-1)" aria-label="Previous period">←</button>
+        <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Sm" IconOnly="true" @onclick="() => StepAsync(-1)" aria-label="Previous period">
+            <Icon Name="IconName.ChevronLeft" Class="h-4 w-4" />
+        </Button>
         <h2 class="cal-title">@Title</h2>
-        <button type="button" class="btn-quiet" @onclick="() => StepAsync(1)" aria-label="Next period">→</button>
+        <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Sm" IconOnly="true" @onclick="() => StepAsync(1)" aria-label="Next period">
+            <Icon Name="IconName.ChevronRight" Class="h-4 w-4" />
+        </Button>
+        <Button Variant="ButtonVariant.Quiet" Size="ButtonSize.Sm" @onclick="Today">Today</Button>
     </div>
 
-    <div class="cal-modes" role="group" aria-label="Calendar scale">
-        <button type="button" class="mode @(_week ? null : "is-active")" aria-pressed="@(!_week ? "true" : "false")" @onclick="() => SetModeAsync(false)">Month</button>
-        <button type="button" class="mode @(_week ? "is-active" : null)" aria-pressed="@(_week ? "true" : "false")" @onclick="() => SetModeAsync(true)">Week</button>
+    <div class="inline-flex rounded-control border border-line-strong bg-surface p-0.5" role="group" aria-label="Calendar scale">
+        <button type="button" class="@ModeClass(!_week)" aria-pressed="@(!_week ? "true" : "false")" @onclick="() => SetModeAsync(false)">Month</button>
+        <button type="button" class="@ModeClass(_week)" aria-pressed="@(_week ? "true" : "false")" @onclick="() => SetModeAsync(true)">Week</button>
     </div>
 
-    <p class="meta">@Model.PlacedCount placed · @Model.Undated.Count undated</p>
+    <p class="m-0 text-xs text-ink-soft sm:ml-auto">@Model.PlacedCount placed · @Model.Undated.Count undated</p>
 </div>
 
 @if (_error is not null)
 {
-    <p class="alert alert-bad" role="alert">@_error</p>
+    <Alert Kind="AlertKind.Error" Class="mb-3">@_error</Alert>
 }
 
-<div class="cal-weekdays" aria-hidden="true">
-    @foreach (var day in new[] { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" })
+@* Seven columns do not fit a phone: below 640px the same period reads as an agenda list. *@
+<div class="sm:hidden">
+    @{ var agenda = Model.Days.Where(day => (day.InMonth || _week) && day.Cards.Count > 0).ToList(); }
+    @if (agenda.Count == 0)
     {
-        <span>@day</span>
+        <p class="ui-card m-0 px-4 py-6 text-center text-sm text-ink-soft">Nothing scheduled in this @(_week ? "week" : "month").</p>
+    }
+    else
+    {
+        <ol class="ui-card m-0 list-none divide-y divide-line overflow-hidden p-0" aria-label="@($"Agenda, {Title}")">
+            @foreach (var day in agenda)
+            {
+                <li class="@($"flex gap-3 px-3 py-2.5 {(day.IsToday ? "bg-brand-wash" : "")}")">
+                    <div class="w-12 shrink-0 text-center">
+                        <span class="block text-2xs font-medium uppercase text-ink-soft">@day.Date.ToString("ddd", System.Globalization.CultureInfo.InvariantCulture)</span>
+                        <span class="block font-display text-lg font-semibold tabular-nums text-ink">@day.Date.Day</span>
+                    </div>
+                    <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+                        @foreach (var card in day.Cards)
+                        {
+                            <a class="kcard kcard-small block truncate text-sm font-medium text-ink no-underline" href="@($"/board/{Board.Id}/item/{card.ItemId}")">@card.Name</a>
+                        }
+                    </div>
+                </li>
+            }
+        </ol>
     }
 </div>
 
-<div class="cal-grid @(_week ? "cal-week" : null)" role="grid" aria-label="@Title">
-    @foreach (var day in Model.Days)
-    {
-        <section class="cal-day @(day.InMonth ? null : "is-outside") @(day.IsToday ? "is-today" : null)"
-                 role="gridcell"
-                 aria-label="@($"{day.Date:ddd d MMM yyyy}, {day.Cards.Count} items")"
-                 @ondragover:preventDefault
-                 @ondrop="() => DropAsync(day)">
-            <header class="cal-day-head">
-                <span class="cal-day-num">@day.Date.Day</span>
-                @if (day.Cards.Count > 0)
-                {
-                    <span class="tag">@day.Cards.Count</span>
-                }
-            </header>
+<div class="hidden sm:block">
+    <div class="cal-weekdays" aria-hidden="true">
+        @foreach (var day in new[] { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" })
+        {
+            <span>@day</span>
+        }
+    </div>
 
-            <div class="cal-cards">
-                @foreach (var card in day.Cards)
-                {
-                    <article class="kcard kcard-small"
-                             draggable="@(CanEdit ? "true" : "false")"
-                             tabindex="0"
-                             aria-label="@($"{card.Name} on {day.Date:dddd d MMMM}. Alt plus left or right arrow reschedules it a day.")"
-                             @ondragstart="() => _dragging = card.ItemId"
-                             @ondragend="() => _dragging = null"
-                             @onkeydown="e => OnCardKeyAsync(e, day, card)">
-                        <p class="kcard-name">@card.Name</p>
-                    </article>
-                }
-            </div>
-        </section>
-    }
+    <div class="cal-grid @(_week ? "cal-week" : null)" role="grid" aria-label="@Title">
+        @foreach (var day in Model.Days)
+        {
+            <section class="cal-day @(day.InMonth ? null : "is-outside") @(day.IsToday ? "is-today" : null)"
+                     role="gridcell"
+                     aria-label="@($"{day.Date:ddd d MMM yyyy}, {day.Cards.Count} items")"
+                     @ondragover:preventDefault
+                     @ondrop="() => DropAsync(day)">
+                <header class="cal-day-head">
+                    <span class="cal-day-num">@day.Date.Day</span>
+                    @if (day.Cards.Count > 0)
+                    {
+                        <span class="ui-pill ui-pill-neutral">@day.Cards.Count</span>
+                    }
+                </header>
+
+                <div class="cal-cards">
+                    @foreach (var card in day.Cards)
+                    {
+                        <article class="kcard kcard-small"
+                                 draggable="@(CanEdit ? "true" : "false")"
+                                 tabindex="0"
+                                 aria-label="@($"{card.Name} on {day.Date:dddd d MMMM}.{(CanEdit ? " Alt plus left or right arrow reschedules it a day." : string.Empty)}")"
+                                 @ondragstart="() => _dragging = card.ItemId"
+                                 @ondragend="() => _dragging = null"
+                                 @onkeydown="e => OnCardKeyAsync(e, day, card)">
+                            <p class="kcard-name">
+                                <a href="@($"/board/{Board.Id}/item/{card.ItemId}")" draggable="false">@card.Name</a>
+                            </p>
+                        </article>
+                    }
+                </div>
+            </section>
+        }
+    </div>
 </div>
 
 @if (Model.Undated.Count > 0)
 {
     <section class="cal-undated">
         <h2>No date yet</h2>
-        <p class="meta">These items have no value in the date column, so they cannot be placed.</p>
-        <div class="cal-cards">
+        <p class="m-0 mb-2 text-xs text-ink-soft">These items have no value in the date column, so they cannot be placed.</p>
+        <div class="cal-cards sm:flex-row sm:flex-wrap">
             @foreach (var card in Model.Undated)
             {
                 <article class="kcard kcard-small">
-                    <p class="kcard-name">@card.Name</p>
+                    <p class="kcard-name"><a href="@($"/board/{Board.Id}/item/{card.ItemId}")">@card.Name</a></p>
                 </article>
             }
         </div>
@@ -108,6 +146,12 @@
     private string Title => _week
         ? $"Week of {CalendarProjection.StartOfWeek(_anchor):d MMM yyyy}"
         : _anchor.ToString("MMMM yyyy");
+
+    private static string ModeClass(bool active) =>
+        "h-7 cursor-pointer rounded-md border-0 px-3 font-[inherit] text-xs font-medium transition-colors "
+        + (active ? "bg-brand-wash text-brand-ink" : "bg-transparent text-ink-soft hover:text-ink");
+
+    private void Today() => _anchor = DateOnly.FromDateTime(DateTime.UtcNow);
 
     private async Task SetModeAsync(bool week)
     {

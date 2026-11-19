@@ -17,30 +17,36 @@
     var state = _done ? "done" : _error is null ? (_invite is null ? "invalid" : "form") : "error";
 }
 
-<main class="mx-auto max-w-[440px] py-10">
-    <div class="ui-card p-6">
+<div class="mx-auto max-w-[440px] py-10">
+    <div class="ui-card p-6 shadow-card">
         @if (state == "done")
         {
-            <h1 class="font-display text-[22px] font-semibold tracking-tight text-ink">You're in</h1>
-            <p class="mt-2 text-sm text-ink-soft">
+            <span class="mb-3 grid h-10 w-10 place-items-center rounded-full bg-ok-bg text-ok" aria-hidden="true">
+                <Icon Name="IconName.Check" Class="h-5 w-5" />
+            </span>
+            <h1 class="m-0 font-display text-xl font-semibold tracking-tight text-ink">You're in</h1>
+            <p class="m-0 mt-2 text-sm text-ink-soft">
                 Your password is set. Sign in with <span class="font-medium text-ink">@_invite?.Email</span>.
             </p>
-            <a class="ui-btn-primary mt-5 !h-10 !px-5" href="/login">Sign in</a>
+            <Button Href="/login" Size="ButtonSize.Lg" Class="mt-5">Sign in</Button>
         }
         else if (_invite is null || state == "invalid")
         {
-            <h1 class="font-display text-[22px] font-semibold tracking-tight text-ink">Invitation not valid</h1>
-            <p class="mt-2 text-sm text-ink-soft">
+            <span class="mb-3 grid h-10 w-10 place-items-center rounded-full bg-surface-2 text-ink-soft ring-1 ring-inset ring-line" aria-hidden="true">
+                <Icon Name="IconName.Clock" Class="h-5 w-5" />
+            </span>
+            <h1 class="m-0 font-display text-xl font-semibold tracking-tight text-ink">Invitation not valid</h1>
+            <p class="m-0 mt-2 text-sm text-ink-soft">
                 This link has already been used, has expired, or was never issued. Ask an administrator
                 for a new invitation.
             </p>
-            <a class="ui-btn-ghost mt-5 !h-10 !px-5" href="/login">Back to sign in</a>
+            <Button Href="/login" Variant="ButtonVariant.Ghost" Size="ButtonSize.Lg" Class="mt-5">Back to sign in</Button>
         }
         else
         {
-            <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-ink">Invitation</p>
-            <h1 class="mt-1 font-display text-[22px] font-semibold tracking-tight text-ink">Choose a password</h1>
-            <p class="mt-2 text-sm text-ink-soft">
+            <p class="m-0 text-2xs font-semibold uppercase tracking-[0.12em] text-brand-ink">Invitation</p>
+            <h1 class="m-0 mt-1 font-display text-xl font-semibold tracking-tight text-ink">Choose a password</h1>
+            <p class="m-0 mt-2 text-sm text-ink-soft">
                 For <span class="font-medium text-ink">@_invite.Email</span>. The link works once and expires
                 @_invite.ExpiresAt.ToLocalTime().ToString("dd MMM yyyy").
             </p>
@@ -48,34 +54,26 @@
             <EditForm Model="Input" FormName="accept-invite" OnValidSubmit="AcceptAsync" class="mt-5 space-y-4">
                 <DataAnnotationsValidator />
 
-                <label class="block">
-                    <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Password</span>
-                    <InputText type="password" @bind-Value="Input.Password" autocomplete="new-password" required
-                               class="h-10 w-full rounded-control border border-line-strong bg-surface px-3 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20" />
-                    <ValidationMessage For="() => Input.Password" class="mt-1 block text-xs text-status-stuck" />
-                </label>
+                <Field Label="Password" Hint="At least 8 characters, with an uppercase letter, a lowercase letter, a digit and a symbol.">
+                    <InputText type="password" @bind-Value="Input.Password" autocomplete="new-password" required class="ui-input ui-input-lg" />
+                    <ValidationMessage For="() => Input.Password" />
+                </Field>
 
-                <label class="block">
-                    <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Confirm password</span>
-                    <InputText type="password" @bind-Value="Input.Confirm" autocomplete="new-password" required
-                               class="h-10 w-full rounded-control border border-line-strong bg-surface px-3 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20" />
-                    <ValidationMessage For="() => Input.Confirm" class="mt-1 block text-xs text-status-stuck" />
-                </label>
-
-                <p class="text-[11px] leading-relaxed text-ink-faint">
-                    At least 8 characters, with an uppercase letter, a lowercase letter, a digit and a symbol.
-                </p>
+                <Field Label="Confirm password">
+                    <InputText type="password" @bind-Value="Input.Confirm" autocomplete="new-password" required class="ui-input ui-input-lg" />
+                    <ValidationMessage For="() => Input.Confirm" />
+                </Field>
 
                 @if (_error is not null)
                 {
-                    <p class="text-xs font-medium text-status-stuck" role="alert">@_error</p>
+                    <Alert Kind="AlertKind.Error">@_error</Alert>
                 }
 
-                <button type="submit" class="ui-btn-primary !h-10 w-full">Set password</button>
+                <Button Type="submit" Size="ButtonSize.Lg" Block="true" Busy="_busy">Set password</Button>
             </EditForm>
         }
     </div>
-</main>
+</div>
 
 @code {
     [Parameter]
@@ -85,6 +83,7 @@
     private ApplicationUser? _user;
     private string? _error;
     private bool _done;
+    private bool _busy;
 
     public InputModel Input { get; set; } = new();
 
@@ -123,26 +122,34 @@
         }
 
         _error = null;
+        _busy = true;
 
-        // The account was created at invite time with a password nobody knows; replace it.
-        await Users.RemovePasswordAsync(_user);
-        var added = await Users.AddPasswordAsync(_user, Input.Password);
-
-        if (!added.Succeeded)
+        try
         {
-            await Users.AddPasswordAsync(_user, Guid.NewGuid().ToString("N") + "!Aa1");
-            _error = string.Join(" ", added.Errors.Select(error => error.Description));
-            return;
-        }
+            // The account was created at invite time with a password nobody knows; replace it.
+            await Users.RemovePasswordAsync(_user);
+            var added = await Users.AddPasswordAsync(_user, Input.Password);
 
-        if (!_invite.Accept(_user.Id))
+            if (!added.Succeeded)
+            {
+                await Users.AddPasswordAsync(_user, Guid.NewGuid().ToString("N") + "!Aa1");
+                _error = string.Join(" ", added.Errors.Select(error => error.Description));
+                return;
+            }
+
+            if (!_invite.Accept(_user.Id))
+            {
+                _error = "This invitation was already used. Ask an administrator for a new one.";
+                return;
+            }
+
+            await Db.SaveChangesAsync();
+            _done = true;
+        }
+        finally
         {
-            _error = "This invitation was already used. Ask an administrator for a new one.";
-            return;
+            _busy = false;
         }
-
-        await Db.SaveChangesAsync();
-        _done = true;
     }
 
     public sealed class InputModel

@@ -8,21 +8,26 @@
 
 @if (Model.Bars.Count == 0)
 {
-    <p class="meta">No item on this board has a start date, so there is nothing to place on the timeline.</p>
+    <EmptyState Title="Nothing on the timeline yet" IconName="IconName.Clock">
+        No item on this board has a start date, so there is nothing to place on the timeline. Add a date in the table view and it appears here.
+    </EmptyState>
 }
 else
 {
     @if (_error is not null)
     {
-        <p class="alert alert-bad" role="alert">@_error</p>
+        <Alert Kind="AlertKind.Error" Class="mb-3">@_error</Alert>
     }
 
     <div class="tl-toolbar">
-        <p class="meta">
-            @Model.From.ToString("d MMM") – @Model.To.ToString("d MMM yyyy") ·
-            @Model.Bars.Count scheduled · @Model.Unscheduled.Count without a start date
+        <p class="m-0 text-sm text-ink">
+            @Model.From.ToString("d MMM") – @Model.To.ToString("d MMM yyyy")
+            <span class="text-ink-soft">· @Model.Bars.Count scheduled · @Model.Unscheduled.Count without a start date</span>
         </p>
-        <p class="meta">Drag a bar, or use the day buttons next to it.</p>
+        @if (CanEdit)
+        {
+            <p class="m-0 text-xs text-ink-soft sm:ml-auto">Drag a bar, or use the day buttons next to it.</p>
+        }
     </div>
 
     <div class="tl" role="table" aria-label="Board timeline">
@@ -39,7 +44,7 @@ else
         @foreach (var bar in Shown)
         {
             <div class="tl-row" role="row">
-                <span class="tl-label" role="cell">@bar.Name</span>
+                <span class="tl-label" role="cell"><a href="@($"/board/{Board.Id}/item/{bar.ItemId}")" title="@bar.Name">@bar.Name</a></span>
                 <div class="tl-track" role="cell" data-timeline-track data-span="@Model.DaySpan">
                     <div class="tl-bar"
                          data-item-id="@bar.ItemId"
@@ -51,10 +56,14 @@ else
                 <div class="tl-actions">
                     @if (CanEdit)
                     {
-                        <button type="button" class="btn-quiet" @onclick="() => ShiftAsync(bar.ItemId, -1)"
-                                aria-label="@($"Move {bar.Name} one day earlier")">−1d</button>
-                        <button type="button" class="btn-quiet" @onclick="() => ShiftAsync(bar.ItemId, 1)"
-                                aria-label="@($"Move {bar.Name} one day later")">+1d</button>
+                        <Button Variant="ButtonVariant.Quiet" Size="ButtonSize.Sm" IconOnly="true" @onclick="() => ShiftAsync(bar.ItemId, -1)"
+                                aria-label="@($"Move {bar.Name} one day earlier")" title="One day earlier">
+                            <Icon Name="IconName.ChevronLeft" Class="h-3.5 w-3.5" />
+                        </Button>
+                        <Button Variant="ButtonVariant.Quiet" Size="ButtonSize.Sm" IconOnly="true" @onclick="() => ShiftAsync(bar.ItemId, 1)"
+                                aria-label="@($"Move {bar.Name} one day later")" title="One day later">
+                            <Icon Name="IconName.ChevronRight" Class="h-3.5 w-3.5" />
+                        </Button>
                     }
                 </div>
             </div>
@@ -63,7 +72,7 @@ else
 
     @if (Model.Bars.Count > Shown.Count)
     {
-        <p class="meta">Showing the first @Shown.Count of @Model.Bars.Count bars.</p>
+        <p class="m-0 mt-2 text-xs text-ink-soft">Showing the first @Shown.Count of @Model.Bars.Count bars.</p>
     }
 }
 

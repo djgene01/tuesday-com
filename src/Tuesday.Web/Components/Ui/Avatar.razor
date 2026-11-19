@@ -1,0 +1,55 @@
+<span class="@($"inline-grid shrink-0 place-items-center rounded-full font-semibold {SizeClass} {(Muted ? "bg-surface-2 text-ink-soft ring-1 ring-inset ring-line" : "bg-brand-tint text-brand-ink")} {Class}".TrimEnd())"
+      title="@(ShowTitle ? Name : null)" aria-hidden="true">@Initials(Name)</span>
+
+@code {
+    [Parameter]
+    public string? Name { get; set; }
+
+    /// <summary>Diameter in px: 24, 28 or 32.</summary>
+    [Parameter]
+    public int Size { get; set; } = 28;
+
+    [Parameter]
+    public bool Muted { get; set; }
+
+    [Parameter]
+    public bool ShowTitle { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    private string SizeClass => Size switch
+    {
+        <= 24 => "h-6 w-6 text-2xs",
+        <= 28 => "h-7 w-7 text-2xs",
+        _ => "h-8 w-8 text-xs"
+    };
+
+    /// <summary>
+    /// Two letters for a person: first and last word of a display name, or the first two
+    /// parts of an email's local part ("ada.lovelace@x" → "AL").
+    /// </summary>
+    public static string Initials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "?";
+        }
+
+        var source = name.Trim();
+
+        if (source.Contains('@', StringComparison.Ordinal))
+        {
+            source = source.Split('@')[0];
+        }
+
+        var parts = source.Split([' ', '.', '_', '-'], StringSplitOptions.RemoveEmptyEntries);
+
+        return parts.Length switch
+        {
+            0 => "?",
+            1 => parts[0][..Math.Min(2, parts[0].Length)].ToUpperInvariant(),
+            _ => string.Concat(char.ToUpperInvariant(parts[0][0]), char.ToUpperInvariant(parts[^1][0]))
+        };
+    }
+}

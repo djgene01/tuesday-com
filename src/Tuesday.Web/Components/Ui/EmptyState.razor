@@ -1,0 +1,67 @@
+@*
+    What a surface says when it has nothing to show: what this place is for, and the next step.
+    Bordered (a standalone card) or bare (inside a card that already has a frame).
+*@
+
+<div class="@($"{(Bare ? "" : "ui-card ")}flex flex-col items-center px-6 text-center {(Compact ? "py-8" : "py-14")} {Class}".Trim())" @attributes="Attributes">
+    @if (Code is not null)
+    {
+        <span class="ui-pill ui-pill-neutral mb-3">@Code</span>
+    }
+    else if (IconName is { } icon)
+    {
+        <span class="mb-3 grid h-11 w-11 place-items-center rounded-full bg-surface-2 text-ink-soft ring-1 ring-inset ring-line" aria-hidden="true">
+            <Icon Name="icon" Class="h-5 w-5" />
+        </span>
+    }
+    @if (Heading)
+    {
+        <h1 class="m-0 font-display text-xl font-semibold tracking-tight text-ink" tabindex="-1">@Title</h1>
+    }
+    else
+    {
+        <p class="m-0 font-display text-md font-semibold text-ink">@Title</p>
+    }
+    @if (ChildContent is not null)
+    {
+        <div class="mx-auto mt-1 max-w-md text-sm text-ink-soft">@ChildContent</div>
+    }
+    @if (Actions is not null)
+    {
+        <div class="mt-5 flex flex-wrap items-center justify-center gap-2">@Actions</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public IconName? IconName { get; set; }
+
+    /// <summary>A short status code shown above the title, such as 404.</summary>
+    [Parameter]
+    public string? Code { get; set; }
+
+    /// <summary>Render the title as the page's h1 (for full-page states like 404).</summary>
+    [Parameter]
+    public bool Heading { get; set; }
+
+    [Parameter]
+    public bool Bare { get; set; }
+
+    [Parameter]
+    public bool Compact { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public RenderFragment? Actions { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? Attributes { get; set; }
+}

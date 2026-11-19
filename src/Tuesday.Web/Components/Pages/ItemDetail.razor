@@ -15,48 +15,59 @@
 
 @if (_board is null || _item is null)
 {
-    <main class="mx-auto max-w-[900px]">
-        <div class="ui-card px-6 py-14 text-center">
-            <p class="font-display text-lg font-semibold text-ink">Item not found</p>
-            <p class="mt-1 text-sm text-ink-soft">Either it does not exist, or it is not shared with you.</p>
-            <a class="ui-btn-primary mt-5" href="/workspace">Back to your workspace</a>
-        </div>
-    </main>
+    <NotFoundPanel Title="Item not found" Message="Either it does not exist, or it is not shared with you." />
 }
 else
 {
-    <main class="mx-auto max-w-[900px]">
-        <nav class="mb-1 flex items-center gap-1.5 text-xs text-ink-soft" aria-label="Breadcrumb">
-            <a class="hover:text-brand" href="/board/@BoardId">@_board.Name</a>
-            <span aria-hidden="true">/</span>
-            <span class="text-ink-faint">@_group?.Title</span>
-        </nav>
+    <div class="mx-auto max-w-[900px]">
+        <PageHeader Title="@_item.Name" Class="mb-4" Crumbs="Crumbs">
+            <Badges>
+                @if (_parent is not null)
+                {
+                    <span class="ui-pill ui-pill-neutral"><Icon Name="IconName.Subitem" Class="h-3 w-3" />Sub-item</span>
+                }
+                @if (!(_card?.CanEdit ?? false))
+                {
+                    <span class="ui-pill ui-pill-neutral"><Icon Name="IconName.Lock" Class="h-3 w-3" />Read-only</span>
+                }
+            </Badges>
+            <Actions>
+                <Button Href="@BackHref" Variant="ButtonVariant.Ghost" IconStart="IconName.ChevronLeft">@BackLabel</Button>
+            </Actions>
+        </PageHeader>
 
-        <div class="mb-4 flex flex-wrap items-center gap-3">
-            <h1 class="font-display text-[26px] font-semibold leading-tight tracking-tight text-ink">@_item.Name</h1>
-            @if (!(_card?.CanEdit ?? false))
+        <section class="ui-card mb-4 overflow-hidden" aria-label="Item values">
+            @if (Columns.Count == 0)
             {
-                <span class="ui-pill border border-line bg-canvas text-ink-soft">Read-only</span>
+                <p class="m-0 px-4 py-4 text-sm text-ink-soft">
+                    @(_parent is null ? "This board has no columns yet." : "Sub-items on this board have no columns yet.")
+                </p>
             }
-            <a class="ui-btn-ghost ml-auto !h-9 !px-4 text-[13px]" href="/board/@BoardId">Back to board</a>
-        </div>
-
-        <section class="ui-card mb-4 divide-y divide-line" aria-label="Item values">
-            @foreach (var column in _board.Columns)
+            else
             {
-                <div class="flex items-baseline gap-4 px-4 py-2.5">
-                    <span class="w-[180px] shrink-0 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">@column.Title</span>
-                    <span class="text-sm text-ink">@ValueOf(column.Id)</span>
-                </div>
+                <dl class="m-0 divide-y divide-line">
+                    @foreach (var column in Columns)
+                    {
+                        <div class="grid grid-cols-1 gap-1 px-4 py-2.5 sm:grid-cols-[minmax(8rem,13rem)_1fr] sm:items-center sm:gap-4">
+                            <dt class="flex items-center gap-2 text-xs font-medium text-ink-soft">
+                                <Icon Name="@ColumnIcon(column.Type)" Class="h-3.5 w-3.5 shrink-0" /><span class="truncate">@column.Title</span>
+                            </dt>
+                            <dd class="m-0 min-w-0 break-words text-sm text-ink">@ValueMarkup(column)</dd>
+                        </div>
+                    }
+                </dl>
             }
         </section>
 
-        <SubItemsPanel BoardId="BoardId" ItemId="ItemId" CanEdit="@(_card?.CanEdit ?? false)" @rendermode="InteractiveServer" />
+        @if (_parent is null)
+        {
+            <SubItemsPanel BoardId="BoardId" ItemId="ItemId" CanEdit="@(_card?.CanEdit ?? false)" @rendermode="InteractiveServer" />
+        }
 
         <UpdateThread BoardId="BoardId" ItemId="ItemId" CanEdit="_card?.CanEdit ?? false" @rendermode="InteractiveServer" />
 
         <AttachmentPanel BoardId="BoardId" ItemId="ItemId" CanEdit="_card?.CanEdit ?? false" @rendermode="InteractiveServer" />
-    </main>
+    </div>
 }
 
 @code {
@@ -69,7 +80,42 @@ else
     private BoardModel? _board;
     private GroupView? _group;
     private ItemView? _item;
+    private ItemView? _parent;
     private BoardCard? _card;
+
+    /// <summary>A sub-item carries the sub-item board's own columns, not the parent board's.</summary>
+    private IReadOnlyList<ColumnView> Columns =>
+        _board is null ? [] : _parent is null ? _board.Columns : _board.SubItemColumns;
+
+    private IReadOnlyList<Crumb> Crumbs
+    {
+        get
+        {
+            var crumbs = new List<Crumb>();
+
+            if (_board is not null)
+            {
+                crumbs.Add(new Crumb(_board.Name, $"/board/{BoardId}"));
+            }
+
+            if (_group is not null)
+            {
+                crumbs.Add(new Crumb(_group.Title));
+            }
+
+            if (_parent is not null)
+            {
+                crumbs.Add(new Crumb(_parent.Name, $"/board/{BoardId}/item/{_parent.Id}"));
+            }
+
+            crumbs.Add(new Crumb(_item?.Name ?? string.Empty));
+            return crumbs;
+        }
+    }
+
+    private string BackHref => _parent is null ? $"/board/{BoardId}" : $"/board/{BoardId}/item/{_parent.Id}";
+
+    private string BackLabel => _parent is null ? "Back to board" : "Back to parent item";
 
     protected override async Task OnInitializedAsync()
     {
@@ -88,8 +134,33 @@ else
 
         _board = await Queries.GetAsync(BoardId);
 
+        // Top-level items first, then sub-items: the sub-item panel links to its children here,
+        // and those links used to 404 because only top-level items were looked up.
         _group = _board?.Groups.FirstOrDefault(group => group.Items.Any(candidate => candidate.Id == ItemId));
         _item = _group?.Items.FirstOrDefault(candidate => candidate.Id == ItemId);
+
+        if (_item is null && _board is not null)
+        {
+            foreach (var group in _board.Groups)
+            {
+                foreach (var parent in group.Items)
+                {
+                    var child = parent.SubItems.FirstOrDefault(candidate => candidate.Id == ItemId);
+                    if (child is not null)
+                    {
+                        _group = group;
+                        _parent = parent;
+                        _item = child;
+                        break;
+                    }
+                }
+
+                if (_item is not null)
+                {
+                    break;
+                }
+            }
+        }
 
         if (_item is null)
         {
@@ -110,8 +181,44 @@ else
         }
     }
 
-    private string ValueOf(Guid columnId) =>
+    private string? ValueOf(Guid columnId) =>
         _item is not null && _item.Cells.TryGetValue(columnId, out var value) && !string.IsNullOrWhiteSpace(value)
             ? value
-            : "—";
+            : null;
+
+    /// <summary>A read-only value shaped by its column type, the way the grid shows it.</summary>
+    private RenderFragment ValueMarkup(ColumnView column) => __builder =>
+    {
+        var value = ValueOf(column.Id);
+
+        if (value is null)
+        {
+            <span class="text-ink-soft">—</span>
+            return;
+        }
+
+        switch (column.Type)
+        {
+            case Tuesday.Domain.Boards.ColumnType.Status:
+                <span class="@($"inline-flex rounded-md px-2 py-0.5 text-xs font-medium {StatusPalette.StatusClasses(value)}")">@value</span>
+                break;
+            case Tuesday.Domain.Boards.ColumnType.Checkbox:
+                var on = bool.TryParse(value, out var flag) && flag;
+                <span class="inline-flex items-center gap-1.5">
+                    <Icon Name="@(on ? IconName.Check : IconName.Close)" Class="@(on ? "h-4 w-4 text-ok" : "h-4 w-4 text-ink-soft")" />@(on ? "Yes" : "No")
+                </span>
+                break;
+            case Tuesday.Domain.Boards.ColumnType.Date when DateOnly.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, out var date):
+                <time class="tabular-nums" datetime="@value">@date.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</time>
+                break;
+            case Tuesday.Domain.Boards.ColumnType.Number:
+                <span class="tabular-nums">@value</span>
+                break;
+            default:
+                <span>@value</span>
+                break;
+        }
+    };
+
+    private static IconName ColumnIcon(Tuesday.Domain.Boards.ColumnType type) => ColumnIcons.For(type);
 }

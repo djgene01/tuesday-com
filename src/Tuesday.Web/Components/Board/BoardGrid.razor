@@ -1,85 +1,124 @@
 @using Tuesday.Application.Boards
+@using Tuesday.Application.Views
 @using Tuesday.Domain.Boards
 @using Tuesday.Infrastructure.Queries
 @using Tuesday.Infrastructure.Values
 @using Tuesday.Web.Security
+@implements IAsyncDisposable
 @inject BoardQueries Queries
 @inject ColumnValueWriter Writer
 @using Tuesday.Domain.Automation
 @inject Tuesday.Infrastructure.Automations.AutomationService Automations
 @inject TenantContextBootstrapper Bootstrapper
 @inject Tuesday.Infrastructure.Boards.ItemEditor Editor
+@inject IJSRuntime JS
+@inject ToastService Toasts
 
 @*
-    The grid carries the reference product's visual language: a white bordered card, a 34px row,
-    faint #E6E9EF rules, group headings tinted with the group's own colour, and statuses as
-    solid filled cells rather than text. Row virtualisation is unchanged — the flattened
-    group/item list is what Virtualize walks.
+    The table view. One table for the whole board: a single scroll area, a sticky header row
+    and a sticky item column, 36px rows with hairline rules, group bands tinted with the
+    group's own colour, and typed editors where the column type has a strict format (a status
+    picker from the column's labels, a date picker, a checkbox, a right-aligned number).
+    Row virtualisation is unchanged — the flattened group/item list is what Virtualize walks.
 *@
 
 <div class="ui-card overflow-hidden">
 
-    <div class="flex h-10 items-center gap-3 border-b border-line px-3">
-        <p class="text-xs text-ink-soft">
+    <div class="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3 py-1.5">
+        <p class="m-0 text-xs text-ink-soft">
             @if (_board is null)
             {
-                <text>Loading…</text>
+                <span class="inline-flex items-center gap-2"><Spinner Class="h-3 w-3" />Loading board…</span>
             }
             else
             {
                 <text>@_board.ItemCount items · @_board.Columns.Count columns</text>
                 @if (_rows.Count < _totalRows)
                 {
-                    <span class="text-ink-faint">· @_rows.Count of @_totalRows rows shown</span>
+                    <span>· @_rows.Count of @_totalRows rows shown</span>
                 }
             }
         </p>
 
+        @if (CanEdit && _board is { ItemCount: > 0 })
+        {
+            <p class="m-0 hidden text-xs text-ink-soft lg:block">Enter saves · Esc undoes · Alt+↑/↓ moves a row</p>
+        }
+
         @if (_error is not null)
         {
-            <p class="ml-auto text-xs font-medium text-status-stuck" role="alert">@_error</p>
+            <p class="m-0 ml-auto inline-flex items-center gap-1.5 text-xs font-medium text-bad" role="alert">
+                <Icon Name="IconName.Alert" Class="h-3.5 w-3.5" />@_error
+            </p>
         }
         else if (_savedAt is not null)
         {
-            <p class="ml-auto text-xs text-ink-faint" role="status">Saved @_savedAt.Value.ToLocalTime().ToString("HH:mm:ss")</p>
+            <p class="m-0 ml-auto inline-flex items-center gap-1 text-xs text-ok" role="status">
+                <Icon Name="IconName.Check" Class="h-3.5 w-3.5" />Saved @_savedAt.Value.ToLocalTime().ToString("HH:mm:ss")
+            </p>
         }
     </div>
 
-    @if (_board is { ItemCount: 0 } empty)
+    @if (_board is null)
+    {
+        <div class="p-4"><Skeleton Lines="6" Height="h-6" /></div>
+    }
+    else if (_board.ItemCount == 0)
     {
         @* An empty board should say what to do next, not show a header with no rows under it. *@
-        <div class="px-6 py-14 text-center">
-            <p class="font-display text-base font-semibold text-ink">No items yet</p>
-            <p class="mx-auto mt-1 max-w-md text-sm text-ink-soft">
-                @if (empty.Columns.Count == 0)
+        <EmptyState Title="No items yet" IconName="IconName.List" Bare="true">
+            @if (_board.Columns.Count == 0)
+            {
+                <text>This board has no columns. Add columns first, then items can be filled in.</text>
+            }
+            else if (CanEdit && _board.Groups.Count > 0)
+            {
+                <text>Add the first item below. It lands in “@_board.Groups[0].Title”, and you can drag it anywhere later.</text>
+            }
+            else
+            {
+                <text>This board has @_board.Columns.Count column@(_board.Columns.Count == 1 ? "" : "s") but no items.</text>
+            }
+        </EmptyState>
+
+        @if (CanEdit && _board.Groups.Count > 0)
+        {
+            var first = _board.Groups[0];
+            <div class="flex items-center gap-2 border-t border-line px-3 py-2">
+                <Icon Name="IconName.Plus" Class="h-4 w-4 shrink-0 text-ink-soft" />
+                <input aria-label="@($"Add item to {first.Title}")"
+                       class="h-8 w-full rounded-control border border-transparent bg-transparent px-2 text-sm text-ink placeholder:text-ink-soft hover:border-line focus-visible:border-brand focus-visible:bg-surface focus-visible:outline-none"
+                       placeholder="Add item"
+                       @bind="Draft(first.Id).Name"
+                       @bind:event="oninput"
+                       @onkeydown="e => AddItemKeyAsync(e, first.Id)" />
+                @if (_addingTo == first.Id)
                 {
-                    <text>This board has no columns. Add columns first, then items can be filled in.</text>
+                    <Spinner Label="Adding…" Class="h-3.5 w-3.5" />
                 }
-                else
-                {
-                    <text>This board has @empty.Columns.Count column@(empty.Columns.Count == 1 ? "" : "s") but no items.</text>
-                }
-            </p>
-        </div>
+            </div>
+        }
     }
-    else if (_board is { } board)
+    else
     {
+        var board = _board;
+        var span = board.Columns.Count + 1;
+
         @* One table for the whole board: a single scroll area, one sticky header, and column
            widths that agree across groups. Group titles are rows of that same table, which is
            what makes a virtualised list possible without per-group scroll boxes. *@
-        <div class="h-[min(72vh,780px)] overflow-auto">
-            <table class="w-full border-collapse text-[13px]">
+        <div class="h-[min(72vh,780px)] overflow-auto overscroll-contain" @ref="_scroller">
+            <table class="w-full border-separate border-spacing-0 text-sm">
                 <caption class="sr-only">@board.Name items by group</caption>
-                <thead class="sticky top-0 z-10 bg-surface">
-                    <tr class="border-b border-line text-[11px] font-medium uppercase tracking-[0.04em] text-ink-faint">
-                        <th class="w-10 py-2 pl-3" scope="col"><span class="sr-only">Open</span></th>
-                        <th class="min-w-[170px] py-2 text-left font-medium" scope="col">Item</th>
+                <thead>
+                    <tr class="text-xs font-medium text-ink-soft">
+                        <th class="sticky left-0 top-0 z-30 min-w-[240px] border-b border-r border-line bg-surface-2 py-2 pl-10 pr-2 text-left font-medium shadow-[4px_0_6px_-4px_rgb(41_37_36/0.14)] md:min-w-[280px]" scope="col">Item</th>
                         @foreach (var column in board.Columns)
                         {
-                            <th class="min-w-[110px] px-2 py-2 text-left font-medium" scope="col">
+                            <th class="sticky top-0 z-20 min-w-[130px] whitespace-nowrap border-b border-r border-line bg-surface-2 px-2 py-2 text-left font-medium last:border-r-0" scope="col">
                                 <span class="flex items-center gap-1.5">
-                                    <span class="text-ink-faint/70" aria-hidden="true">@ColumnGlyph(column.Type)</span>
-                                    @column.Title
+                                    <Icon Name="@ColumnIcons.For(column.Type)" Class="h-3.5 w-3.5 shrink-0 text-ink-soft" />
+                                    <span class="truncate">@column.Title</span>
                                 </span>
                             </th>
                         }
@@ -89,202 +128,208 @@
                     <Virtualize Items="_rows" Context="row" SpacerElement="tr" OverscanCount="8">
                         @if (row.Group is not null)
                         {
-                            <tr class="group-row" @key="RowKey(row)" style="--group: @GroupHex(row.Group.Colour)"
+                            <tr @key="RowKey(row)" style="--group: @StatusPalette.GroupFill(row.Group.Colour)"
                                 @ondragover:preventDefault
                                 @ondrop="() => DropOnGroupAsync(row.Group.Id)">
-                                <td colspan="@(board.Columns.Count + 2)"
-                                    class="border-b border-line px-3 py-2"
-                                    style="background: @Tint(row.Group.Colour)">
-                                    <div class="flex items-center gap-2">
-                                        <span class="h-3 w-1 shrink-0 rounded-full" style="background: var(--group)" aria-hidden="true"></span>
-                                        <h2 class="font-display text-[13px] font-semibold text-ink">@row.Group.Title</h2>
-                                        <span class="rounded-full bg-white/70 px-1.5 py-0.5 text-[10px] font-medium text-ink-soft">@row.Group.Items.Count</span>
+                                <td colspan="@span" class="border-b border-line p-0" style="background: @StatusPalette.GroupTint(row.Group.Colour)">
+                                    <div class="ui-group-head sticky left-0 w-max max-w-[100vw] py-2">
+                                        <span class="h-4 w-1 shrink-0 rounded-full" style="background: var(--group)" aria-hidden="true"></span>
+                                        <h2 class="m-0 font-display text-sm font-semibold tracking-normal text-ink" style="color: color-mix(in srgb, var(--group) 45%, var(--color-ink))">@row.Group.Title</h2>
+                                        <span class="ui-pill bg-surface/80 text-ink-soft ring-1 ring-inset ring-line">@row.Group.Items.Count</span>
                                     </div>
                                 </td>
                             </tr>
                         }
                         else if (row.Item is not null)
                         {
+                            var item = row.Item;
+                            var expanded = _expanded.Contains(item.Id);
                             <tr @key="RowKey(row)"
-                                class="group border-b border-line/80 last:border-0 hover:bg-canvas/70 @(_dragging == row.Item.Id ? "opacity-50" : null) @(_dropKey == row.Key ? "shadow-[inset_0_2px_0_0_var(--color-brand)]" : null)"
+                                class="@($"group {(_dragging == item.Id ? "opacity-50" : null)} {(_dropKey == row.Key ? "[&>td]:shadow-[inset_0_2px_0_0_var(--color-brand)]" : null)}")"
                                 draggable="@(CanEdit ? "true" : "false")"
-                                @ondragstart="() => StartDrag(row.Item.Id)"
+                                @ondragstart="() => StartDrag(item.Id)"
                                 @ondragend="() => EndDrag()"
                                 @ondragover:preventDefault
                                 @ondragenter="() => _dropKey = row.Key"
                                 @ondrop="() => DropOnItemAsync(row)">
-                                <td class="py-0 pl-2 align-middle">
-                                    <span class="flex items-center gap-0.5">
+                                <td class="sticky left-0 z-10 h-9 border-b border-r border-line bg-surface p-0 align-middle shadow-[4px_0_6px_-4px_rgb(41_37_36/0.14)] group-hover:bg-surface-2">
+                                    <div class="flex h-9 items-center gap-0.5 pl-1.5 pr-1">
                                         <button type="button"
-                                                class="grid h-6 w-5 place-items-center rounded text-ink-faint transition hover:bg-brand-tint hover:text-brand-ink"
-                                                aria-expanded="@_expanded.Contains(row.Item.Id)"
-                                                aria-label="@($"{( _expanded.Contains(row.Item.Id) ? "Collapse" : "Expand")} sub-items of {row.Item.Name}")"
-                                                @onclick="() => ToggleExpand(row.Item.Id)">
-                                            <span class="text-[10px] @(_expanded.Contains(row.Item.Id) ? "rotate-90" : null) inline-block transition" aria-hidden="true">▸</span>
+                                                class="grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-ink-soft transition hover:bg-brand-wash hover:text-brand-ink"
+                                                aria-expanded="@(expanded ? "true" : "false")"
+                                                aria-label="@($"{(expanded ? "Collapse" : "Expand")} sub-items of {item.Name}")"
+                                                @onclick="() => ToggleExpand(item.Id)">
+                                            <Icon Name="IconName.ChevronRight" Class="@($"h-3.5 w-3.5 transition-transform {(expanded ? "rotate-90" : "")}")" />
                                         </button>
-                                        <a class="row-open grid h-6 w-6 place-items-center rounded text-ink-faint opacity-0 transition hover:bg-brand-tint hover:text-brand-ink focus-visible:opacity-100 group-hover:opacity-100"
-                                           href="@($"/board/{BoardId}/item/{row.Item.Id}")"
-                                           aria-label="@($"Open {row.Item.Name}")"><span aria-hidden="true">›</span></a>
-                                    </span>
-                                </td>
-                                <td class="py-0 align-middle">
-                                    <input class="h-[34px] w-full border-0 bg-transparent px-1 text-[13px] font-medium text-ink outline-none focus:bg-brand-tint/60 focus:ring-1 focus:ring-inset focus:ring-brand disabled:cursor-default"
-                                           aria-label="Item name"
-                                           value="@ItemNameById(row.Item.Id)"
-                                           disabled="@(!CanEdit)"
-                                           @oninput="e => _pendingNames[row.Item.Id] = e.Value?.ToString()"
-                                           @onchange="_ => SaveNameAsync(row.Item.Id)"
-                                           @onkeydown="e => OnKeyAsync(e, row.Item.Id, Guid.Empty)" />
+                                        <input class="h-8 min-w-0 flex-1 rounded-md border-0 bg-transparent px-1.5 text-sm font-medium text-ink focus-visible:bg-surface focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand disabled:cursor-default"
+                                               aria-label="Item name"
+                                               value="@ItemNameById(item.Id)"
+                                               data-committed="@ItemNameById(item.Id)"
+                                               disabled="@(!CanEdit)"
+                                               @oninput="e => _pendingNames[item.Id] = e.Value?.ToString()"
+                                               @onchange="_ => SaveNameAsync(item.Id)"
+                                               @onkeydown="e => OnKeyAsync(e, item.Id, Guid.Empty)" />
+                                        @if (item.SubItemCount > 0)
+                                        {
+                                            <span class="ui-pill ui-pill-neutral shrink-0" title="@($"{item.SubItemCount} sub-items")">
+                                                <Icon Name="IconName.Subitem" Class="h-3 w-3" />@item.SubItemCount
+                                            </span>
+                                        }
+                                        <a class="grid h-7 w-7 shrink-0 place-items-center rounded-md text-ink-soft no-underline opacity-0 transition hover:bg-brand-wash hover:text-brand-ink focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
+                                           href="@($"/board/{BoardId}/item/{item.Id}")"
+                                           aria-label="@($"Open {item.Name}")"
+                                           draggable="false">
+                                            <Icon Name="IconName.External" Class="h-3.5 w-3.5" />
+                                        </a>
+                                    </div>
                                 </td>
                                 @foreach (var column in board.Columns)
                                 {
-                                    <td class="py-0 align-middle">
-                                        <input class="@CellClass(column, CellInput(row.Item.Id, column.Id))"
-                                               aria-label="@($"{row.Item.Name}: {column.Title}")"
-                                               value="@CellText(row.Item.Id, column.Id)"
-                                               disabled="@(!CanEdit)"
-                                               @oninput="e => _pendingCells[(row.Item.Id, column.Id)] = e.Value?.ToString()"
-                                               @onchange="_ => SaveCellAsync(row.Item.Id, column.Id)"
-                                               @onkeydown="e => OnKeyAsync(e, row.Item.Id, column.Id)" />
+                                    <td class="h-9 border-b border-r border-line bg-surface p-0 align-middle last:border-r-0 group-hover:bg-surface-2">
+                                        @CellEditor(item.Id, item.Name, column)
                                     </td>
                                 }
                             </tr>
                         }
                         else if (row.PanelFor is not null)
                         {
-                            <tr class="subpanel">
-                                <td colspan="@(board.Columns.Count + 2)" class="border-b border-line bg-canvas/60 p-0">
-                                    <div class="px-8 py-3">
-                                        <div class="mb-2 flex items-center gap-2">
-                                            <h3 class="font-display text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Sub-items</h3>
-                                            <span class="rounded-full bg-white px-1.5 py-0.5 text-[10px] font-medium text-ink-soft">@row.PanelFor.SubItems.Count</span>
+                            var parent = row.PanelFor;
+                            <tr @key="RowKey(row)">
+                                <td colspan="@span" class="border-b border-line bg-surface-2 p-0">
+                                    <div class="sticky left-0 w-[min(100%,calc(100vw-3rem))] max-w-[1100px] py-3 pl-10 pr-4 md:w-[min(100%,calc(100vw-8rem))]">
+                                        <div class="mb-2 flex flex-wrap items-center gap-2">
+                                            <h3 class="ui-section-title m-0">Sub-items of @parent.Name</h3>
+                                            <span class="ui-pill ui-pill-neutral">@parent.SubItems.Count</span>
 
-                                            <span class="ml-auto inline-flex items-center gap-2">
-                                                <a class="rounded-control px-2 py-1 text-[11px] font-medium text-ink-soft no-underline transition hover:text-brand"
-                                                   href="@($"/board/{BoardId}/subitems")">Manage sub-item columns</a>
+                                            <span class="ml-auto inline-flex items-center gap-1">
+                                                <Button Href="@($"/board/{BoardId}/subitems")" Variant="ButtonVariant.Quiet" Size="ButtonSize.Sm">Manage sub-item columns</Button>
 
                                                 @if (CanEdit)
                                                 {
-                                                    <button type="button"
-                                                            class="rounded-control border border-line-strong bg-surface px-2.5 py-1 text-[11px] font-medium text-ink transition hover:border-brand hover:text-brand disabled:opacity-50"
-                                                            disabled="@_busy"
-                                                            @onclick="CopySubItemColumnsAsync">
+                                                    <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Sm" Disabled="_busy" @onclick="CopySubItemColumnsAsync">
                                                         @(board.HasSubItemColumns ? "Copy missing columns" : "Copy columns from this board")
-                                                    </button>
+                                                    </Button>
                                                 }
                                             </span>
                                         </div>
 
                                         @if (!board.HasSubItemColumns)
                                         {
-                                            <p class="max-w-2xl text-[12px] leading-relaxed text-ink-soft">
+                                            <p class="m-0 max-w-2xl text-xs leading-relaxed text-ink-soft">
                                                 Sub-items can have their own columns. Copy this board's columns to start them off —
                                                 the copy is one-way, so later changes to either side stay independent.
                                             </p>
                                         }
                                         else
                                         {
-                                            <table class="w-full border-collapse text-[12.5px]">
-                                                <thead>
-                                                    <tr class="text-[10px] uppercase tracking-[0.06em] text-ink-faint">
-                                                        <th class="w-[28%] py-1 pr-2 text-left font-semibold">Sub-item</th>
-                                                        @foreach (var column in board.SubItemColumns)
-                                                        {
-                                                            <th class="py-1 pr-2 text-left font-semibold">@column.Title</th>
-                                                        }
-                                                        <th class="w-16 py-1 text-right font-semibold"><span class="sr-only">Order</span></th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    @if (row.PanelFor.SubItems.Count == 0)
-                                                    {
-                                                        <tr><td class="py-2 text-ink-faint" colspan="@(board.SubItemColumns.Count + 2)">No sub-items yet.</td></tr>
-                                                    }
-
-                                                    @foreach (var sub in row.PanelFor.SubItems)
-                                                    {
-                                                        <tr class="border-t border-line/70">
-                                                            <td class="py-0 pr-2 align-middle">
-                                                                <input class="h-8 w-full rounded-control border border-transparent bg-transparent px-1 text-[12.5px] text-ink outline-none focus:border-brand focus:bg-surface"
-                                                                       aria-label="@($"Sub-item name: {sub.Name}")"
-                                                                       value="@ItemNameById(sub.Id)"
-                                                                       disabled="@(!CanEdit)"
-                                                                       @oninput="e => _pendingNames[sub.Id] = e.Value?.ToString()"
-                                                                       @onchange="_ => SaveNameAsync(sub.Id)" />
-                                                            </td>
+                                            <div class="overflow-x-auto rounded-control border border-line bg-surface">
+                                                <table class="w-full border-collapse text-sm">
+                                                    <thead>
+                                                        <tr class="bg-surface-2 text-xs text-ink-soft">
+                                                            <th class="w-[28%] min-w-[180px] border-b border-line px-2 py-1.5 text-left font-medium">Sub-item</th>
                                                             @foreach (var column in board.SubItemColumns)
                                                             {
-                                                                <td class="py-0 pr-2 align-middle">
-                                                                    <input class="@CellClass(column, CellInput(sub.Id, column.Id))"
-                                                                           aria-label="@($"{sub.Name}: {column.Title}")"
-                                                                           value="@CellText(sub.Id, column.Id)"
-                                                                           disabled="@(!CanEdit)"
-                                                                           @oninput="e => _pendingCells[(sub.Id, column.Id)] = e.Value?.ToString()"
-                                                                           @onchange="_ => SaveCellAsync(sub.Id, column.Id)" />
-                                                                </td>
-                                                            }
-                                                            <td class="py-0 text-right align-middle">
-                                                                @if (CanEdit)
-                                                                {
-                                                                    <span class="inline-flex">
-                                                                        <button type="button" class="grid h-6 w-6 place-items-center rounded text-ink-faint hover:bg-brand-tint hover:text-brand disabled:opacity-40"
-                                                                                aria-label="@($"Move {sub.Name} up")"
-                                                                                @onclick="() => MoveSubItemAsync(row.PanelFor, sub.Id, -1)">↑</button>
-                                                                        <button type="button" class="grid h-6 w-6 place-items-center rounded text-ink-faint hover:bg-brand-tint hover:text-brand disabled:opacity-40"
-                                                                                aria-label="@($"Move {sub.Name} down")"
-                                                                                @onclick="() => MoveSubItemAsync(row.PanelFor, sub.Id, 1)">↓</button>
+                                                                <th class="min-w-[120px] border-b border-l border-line px-2 py-1.5 text-left font-medium">
+                                                                    <span class="flex items-center gap-1.5">
+                                                                        <Icon Name="@ColumnIcons.For(column.Type)" Class="h-3.5 w-3.5 shrink-0" />@column.Title
                                                                     </span>
-                                                                }
-                                                            </td>
+                                                                </th>
+                                                            }
+                                                            <th class="w-16 border-b border-l border-line py-1.5 text-right font-medium"><span class="sr-only">Order</span></th>
                                                         </tr>
-                                                    }
-                                                </tbody>
-                                            </table>
+                                                    </thead>
+                                                    <tbody>
+                                                        @if (parent.SubItems.Count == 0)
+                                                        {
+                                                            <tr><td class="px-2 py-2.5 text-ink-soft" colspan="@(board.SubItemColumns.Count + 2)">No sub-items yet.</td></tr>
+                                                        }
+
+                                                        @for (var index = 0; index < parent.SubItems.Count; index++)
+                                                        {
+                                                            var sub = parent.SubItems[index];
+                                                            var subIndex = index;
+                                                            <tr class="group">
+                                                                <td class="h-9 border-b border-line p-0 align-middle group-last:border-b-0">
+                                                                    <input class="h-8 w-full rounded-md border-0 bg-transparent px-2 text-sm text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand disabled:cursor-default"
+                                                                           aria-label="@($"Sub-item name: {sub.Name}")"
+                                                                           value="@ItemNameById(sub.Id)"
+                                                                           data-committed="@ItemNameById(sub.Id)"
+                                                                           disabled="@(!CanEdit)"
+                                                                           @oninput="e => _pendingNames[sub.Id] = e.Value?.ToString()"
+                                                                           @onchange="_ => SaveNameAsync(sub.Id)"
+                                                                           @onkeydown="e => OnKeyAsync(e, sub.Id, Guid.Empty)" />
+                                                                </td>
+                                                                @foreach (var column in board.SubItemColumns)
+                                                                {
+                                                                    <td class="h-9 border-b border-l border-line p-0 align-middle group-last:border-b-0">
+                                                                        @CellEditor(sub.Id, sub.Name, column)
+                                                                    </td>
+                                                                }
+                                                                <td class="border-b border-l border-line px-1 text-right align-middle group-last:border-b-0">
+                                                                    @if (CanEdit)
+                                                                    {
+                                                                        <span class="inline-flex">
+                                                                            <Button Variant="ButtonVariant.Quiet" Size="ButtonSize.Sm" IconOnly="true"
+                                                                                    aria-label="@($"Move {sub.Name} up")" Disabled="@(subIndex == 0)"
+                                                                                    @onclick="() => MoveSubItemAsync(parent, sub.Id, -1)"><Icon Name="IconName.ArrowUp" Class="h-3.5 w-3.5" /></Button>
+                                                                            <Button Variant="ButtonVariant.Quiet" Size="ButtonSize.Sm" IconOnly="true"
+                                                                                    aria-label="@($"Move {sub.Name} down")" Disabled="@(subIndex == parent.SubItems.Count - 1)"
+                                                                                    @onclick="() => MoveSubItemAsync(parent, sub.Id, 1)"><Icon Name="IconName.ArrowDown" Class="h-3.5 w-3.5" /></Button>
+                                                                        </span>
+                                                                    }
+                                                                </td>
+                                                            </tr>
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            </div>
 
                                             @if (CanEdit)
                                             {
-                                                <div class="mt-2 flex items-center gap-2">
-                                                    @* Committed on change, not on every keystroke: re-rendering the grid while the
-                                                       user is still typing resets the caret and drops characters. *@
-                                                    <input type="text" class="h-8 w-64 rounded-control border border-line-strong bg-surface px-2 text-[12.5px] text-ink outline-none focus:border-brand"
+                                                <form class="mt-2 flex max-w-md items-center gap-2" @onsubmit="() => AddSubItemAsync(parent)" @onsubmit:preventDefault>
+                                                    <input type="text" class="ui-input ui-input-sm"
                                                            placeholder="New sub-item name"
-                                                           aria-label="New sub-item name"
-                                                           value="@(_addSubFor == row.PanelFor.Id ? _addSubName : string.Empty)"
-                                                           @onchange="e => { _addSubFor = row.PanelFor.Id; _addSubName = e.Value?.ToString() ?? string.Empty; }" />
-                                                    <button type="button" class="ui-btn-primary !h-8 !px-3 text-[12px] disabled:opacity-50"
-                                                            disabled="@_busy"
-                                                            @onclick="() => AddSubItemAsync(row.PanelFor)">
-                                                        Add
-                                                    </button>
-                                                </div>
+                                                           aria-label="@($"New sub-item of {parent.Name}")"
+                                                           @bind="SubDraft(parent.Id).Name"
+                                                           @bind:event="oninput" />
+                                                    <Button Type="submit" Size="ButtonSize.Sm" IconStart="IconName.Plus" Busy="@(_busy && _addingSubTo == parent.Id)"
+                                                            Disabled="@string.IsNullOrWhiteSpace(SubDraft(parent.Id).Name)">Add</Button>
+                                                </form>
                                             }
                                         }
                                     </div>
                                 </td>
                             </tr>
                         }
+                        else if (row.AddTo is not null)
+                        {
+                            var group = row.AddTo;
+                            <tr @key="RowKey(row)">
+                                <td class="sticky left-0 z-10 h-9 border-b border-r border-line bg-surface p-0 shadow-[4px_0_6px_-4px_rgb(41_37_36/0.14)]">
+                                    <div class="flex h-9 items-center gap-1 pl-3 pr-1">
+                                        <Icon Name="IconName.Plus" Class="h-3.5 w-3.5 shrink-0 text-ink-soft" />
+                                        <input aria-label="@($"Add item to {group.Title}")"
+                                               class="h-8 min-w-0 flex-1 rounded-md border-0 bg-transparent px-1.5 text-sm text-ink placeholder:text-ink-soft focus-visible:bg-surface focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand"
+                                               placeholder="Add item"
+                                               @bind="Draft(group.Id).Name"
+                                               @bind:event="oninput"
+                                               @onkeydown="e => AddItemKeyAsync(e, group.Id)" />
+                                        @if (_addingTo == group.Id)
+                                        {
+                                            <Spinner Class="h-3.5 w-3.5 text-ink-soft" />
+                                            <span class="sr-only" role="status">Adding…</span>
+                                        }
+                                    </div>
+                                </td>
+                                @if (board.Columns.Count > 0)
+                                {
+                                    <td colspan="@board.Columns.Count" class="border-b border-line bg-surface"></td>
+                                }
+                            </tr>
+                        }
                     </Virtualize>
                 </tbody>
             </table>
-        </div>
-    }
-
-    @if (CanEdit && _board is { } addable && addable.Groups.Count > 0)
-    {
-        @* Without this a fresh board can never receive its first item: the empty state only
-           describes the problem, and the seeded demo boards hid that. *@
-        <div class="flex items-center gap-2 border-t border-line px-3 py-2">
-            <span class="text-sm text-ink-faint" aria-hidden="true">+</span>
-            <input aria-label="Add item"
-                   class="w-full bg-transparent text-sm text-ink placeholder:text-ink-faint focus:outline-none"
-                   placeholder="Add item"
-                   @bind="_addItemName"
-                   @bind:event="oninput"
-                   @onkeydown="AddItemKeyAsync" />
-            @if (_addingItem)
-            {
-                <span class="text-xs text-ink-faint" role="status">Adding…</span>
-            }
         </div>
     }
 </div>
@@ -309,8 +354,13 @@
     private string? _error;
     private DateTimeOffset? _savedAt;
     private string? _lastFired;
-    private string _addItemName = string.Empty;
-    private bool _addingItem;
+
+    // Per-group "add item" drafts and per-parent "add sub-item" drafts. Bound with @bind so a
+    // successful add clears exactly the box it came from.
+    private readonly Dictionary<Guid, DraftText> _itemDrafts = [];
+    private readonly Dictionary<Guid, DraftText> _subDrafts = [];
+    private Guid? _addingTo;
+    private Guid? _addingSubTo;
 
     // The flattened render list: one entry per group heading plus one per item. Virtualize
     // walks this instead of the model, so an item row and a group row can share a table.
@@ -319,10 +369,39 @@
     // Bumped on revert so the rows are re-created and show their committed values again.
     private int _revision;
 
+    private ElementReference _scroller;
+    private IJSObjectReference? _module;
+    private bool _wired;
+
     protected override async Task OnInitializedAsync()
     {
         await Bootstrapper.EnsureResolvedAsync();
         await LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_board is not { ItemCount: > 0 } || !CanEdit)
+        {
+            return;
+        }
+
+        if (_wired)
+        {
+            return;
+        }
+
+        try
+        {
+            _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/grid.js");
+            await _module.InvokeVoidAsync("wire", _scroller);
+            _wired = true;
+        }
+        catch (JSException)
+        {
+            // Without the helper, Escape falls back to reloading the board's committed values.
+            _module = null;
+        }
     }
 
     private async Task LoadAsync()
@@ -336,12 +415,19 @@
             return;
         }
 
+        if (_board.ItemCount == 0)
+        {
+            // The scroll area goes away with the last item; a new one needs wiring again.
+            _wired = false;
+        }
+
         BuildRows();
     }
 
     /// <summary>
-    /// Flattens the board into virtualised rows: group bands, item rows and — for an expanded
-    /// item — one panel row holding its sub-items.
+    /// Flattens the board into virtualised rows: group bands, item rows, for an expanded
+    /// item one panel row holding its sub-items, and for an editor a trailing "add item" row
+    /// per group.
     /// </summary>
     private void BuildRows()
     {
@@ -352,7 +438,7 @@
             return;
         }
 
-        var rows = new List<GridRow>(_board.ItemCount + _board.Groups.Count);
+        var rows = new List<GridRow>(_board.ItemCount + (_board.Groups.Count * 2));
 
         foreach (var group in _board.Groups)
         {
@@ -375,6 +461,11 @@
                     }
                 }
             }
+
+            if (CanEdit)
+            {
+                rows.Add(new GridRow($"a:{group.Id}", null, null, null, group));
+            }
         }
 
         _rows = rows;
@@ -391,33 +482,173 @@
         }
     }
 
+    // --- typed cell editors ---------------------------------------------------------
+
+    private const string CellBase =
+        "h-9 w-full border-0 px-2 text-sm text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand disabled:cursor-default";
+
+    /// <summary>
+    /// The editor for one cell. A typed control is used only where its value round-trips in
+    /// exactly the format the value writer accepts; anything else stays a text box.
+    /// </summary>
+    private RenderFragment CellEditor(Guid itemId, string itemName, ColumnView column) => __builder =>
+    {
+        var committed = CellText(itemId, column.Id);
+        var label = $"{itemName}: {column.Title}";
+
+        switch (column.Type)
+        {
+            case ColumnType.Status when ColumnSettings.Labels(column.SettingsJson) is { Count: > 0 } labels:
+                {
+                    var current = committed ?? string.Empty;
+                    <div class="h-9 p-1">
+                        <select class="@($"h-7 w-full cursor-pointer appearance-none rounded-md border-0 px-2 text-center text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand disabled:cursor-default {StatusPalette.StatusClasses(current)}")"
+                                aria-label="@label"
+                                disabled="@(!CanEdit)"
+                                @onchange="e => CommitCellAsync(itemId, column.Id, e.Value?.ToString())">
+                            <option value="" selected="@(current.Length == 0)">—</option>
+                            @foreach (var option in labels)
+                            {
+                                <option value="@option" selected="@(string.Equals(option, current, StringComparison.Ordinal))">@option</option>
+                            }
+                            @if (current.Length > 0 && !labels.Contains(current))
+                            {
+                                <option value="@current" selected>@current</option>
+                            }
+                        </select>
+                    </div>
+                    break;
+                }
+
+            case ColumnType.Date when committed is null || IsIsoDate(committed):
+                <input type="date"
+                       class="@($"{CellBase} bg-transparent tabular-nums text-ink-soft")"
+                       aria-label="@label"
+                       value="@committed"
+                       disabled="@(!CanEdit)"
+                       @onchange="e => CommitCellAsync(itemId, column.Id, e.Value?.ToString())" />
+                break;
+
+            case ColumnType.Checkbox:
+                {
+                    var on = bool.TryParse(committed, out var flag) && flag;
+                    <div class="grid h-9 place-items-center">
+                        <input type="checkbox" class="ui-check" aria-label="@label"
+                               checked="@on"
+                               disabled="@(!CanEdit)"
+                               @onchange="e => CommitCheckboxAsync(itemId, column.Id, e)" />
+                    </div>
+                    break;
+                }
+
+            default:
+                {
+                    // A status column without configured labels is still a free-text status:
+                    // it keeps its coloured fill so the column can be skimmed.
+                    var status = column.Type == ColumnType.Status;
+                    var tone = status
+                        ? $"h-7 rounded-md px-2 text-center text-xs font-medium {StatusPalette.StatusClasses(committed)}"
+                        : $"{CellBase} bg-transparent {TextTone(column.Type)}";
+                    <div class="@(status ? "h-9 p-1" : "contents")">
+                        <input class="@($"{(status ? "w-full border-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand disabled:cursor-default " : "")}{tone}")"
+                               aria-label="@label"
+                               inputmode="@(column.Type == ColumnType.Number ? "decimal" : null)"
+                               value="@committed"
+                               data-committed="@committed"
+                               disabled="@(!CanEdit)"
+                               @oninput="e => _pendingCells[(itemId, column.Id)] = e.Value?.ToString()"
+                               @onchange="_ => SaveCellAsync(itemId, column.Id)"
+                               @onkeydown="e => OnKeyAsync(e, itemId, column.Id)" />
+                    </div>
+                    break;
+                }
+        }
+    };
+
+    private static string TextTone(ColumnType type) => type switch
+    {
+        ColumnType.Number => "text-right tabular-nums",
+        ColumnType.Date => "tabular-nums text-ink-soft",
+        ColumnType.People or ColumnType.Dropdown => "text-ink-soft",
+        _ => string.Empty
+    };
+
+    private static bool IsIsoDate(string value) =>
+        DateOnly.TryParseExact(value, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out _);
+
+    /// <summary>A picker, checkbox or date commits the moment it changes; there is no draft.</summary>
+    private async Task CommitCellAsync(Guid itemId, Guid columnId, string? value)
+    {
+        _pendingCells[(itemId, columnId)] = value;
+        await SaveCellAsync(itemId, columnId);
+    }
+
+    /// <summary>Checkbox cells store "true"/"false", the strings the value writer parses.</summary>
+    private Task CommitCheckboxAsync(Guid itemId, Guid columnId, ChangeEventArgs args) =>
+        CommitCellAsync(itemId, columnId, args.Value is true ? "true" : "false");
+
+    // --- adding ----------------------------------------------------------------------
+
+    private sealed class DraftText
+    {
+        public string Name { get; set; } = string.Empty;
+    }
+
+    private DraftText Draft(Guid groupId)
+    {
+        if (!_itemDrafts.TryGetValue(groupId, out var draft))
+        {
+            draft = new DraftText();
+            _itemDrafts[groupId] = draft;
+        }
+
+        return draft;
+    }
+
+    private DraftText SubDraft(Guid parentId)
+    {
+        if (!_subDrafts.TryGetValue(parentId, out var draft))
+        {
+            draft = new DraftText();
+            _subDrafts[parentId] = draft;
+        }
+
+        return draft;
+    }
+
     // --- drag and drop ---------------------------------------------------------------
 
     private Guid? _dragging;
     private string? _dropKey;
     private readonly HashSet<Guid> _expanded = [];
-    private async Task AddItemKeyAsync(KeyboardEventArgs args)
+
+    private async Task AddItemKeyAsync(KeyboardEventArgs args, Guid groupId)
     {
         if (args.Key != "Enter")
         {
             return;
         }
 
-        await AddItemAsync();
+        await AddItemAsync(groupId);
     }
 
-    private async Task AddItemAsync()
+    /// <summary>Adds an item to the group whose "add" row it was typed in.</summary>
+    private async Task AddItemAsync(Guid groupId)
     {
-        if (_addingItem || string.IsNullOrWhiteSpace(_addItemName) || _board is not { Groups.Count: > 0 } board)
+        var draft = Draft(groupId);
+
+        if (_addingTo is not null || string.IsNullOrWhiteSpace(draft.Name) || _board is null)
         {
             return;
         }
 
-        _addingItem = true;
+        _addingTo = groupId;
 
         try
         {
-            var result = await Editor.AddAsync(BoardId, board.Groups[0].Id, _addItemName.Trim());
+            var name = draft.Name.Trim();
+            var result = await Editor.AddAsync(BoardId, groupId, name);
 
             if (!result.Succeeded)
             {
@@ -425,17 +656,17 @@
                 return;
             }
 
-            _addItemName = string.Empty;
+            _error = null;
+            draft.Name = string.Empty;
             await LoadAsync();
+            Toasts.Success($"Item \"{name}\" added.");
         }
         finally
         {
-            _addingItem = false;
+            _addingTo = null;
         }
     }
 
-    private Guid? _addSubFor;
-    private string _addSubName = string.Empty;
     private bool _busy;
 
     private void ToggleExpand(Guid itemId)
@@ -450,16 +681,19 @@
 
     private async Task AddSubItemAsync(ItemView parent)
     {
-        if (_busy || string.IsNullOrWhiteSpace(_addSubName))
+        var draft = SubDraft(parent.Id);
+
+        if (_busy || string.IsNullOrWhiteSpace(draft.Name))
         {
             return;
         }
 
         _busy = true;
+        _addingSubTo = parent.Id;
 
         try
         {
-            var result = await Editor.AddAsync(BoardId, parent.GroupId, _addSubName, parent.Id);
+            var result = await Editor.AddAsync(BoardId, parent.GroupId, draft.Name.Trim(), parent.Id);
 
             if (!result.Succeeded)
             {
@@ -468,8 +702,7 @@
             }
 
             _error = null;
-            _addSubName = string.Empty;
-            _addSubFor = null;
+            draft.Name = string.Empty;
             _expanded.Add(parent.Id);
 
             await RestoreAsync();
@@ -477,6 +710,7 @@
         finally
         {
             _busy = false;
+            _addingSubTo = null;
         }
     }
 
@@ -583,81 +817,6 @@
         await RestoreAsync();
     }
 
-    private string? ItemName(ItemView item) =>
-        _names.TryGetValue(item.Id, out var value) ? value : item.Name;
-
-    /// <summary>
-    /// A cell's class follows its column type, so status, dates and numbers are visually
-    /// distinguishable without reading every word. Status also takes a semantic tone.
-    /// </summary>
-    private static string CellClass(ColumnView column, string? value)
-    {
-        // No background in the base class: a status carries its own fill, and a stray
-        // bg-transparent here would win the cascade and flatten every status to white.
-        const string baseCell =
-            "h-[34px] w-full border-0 px-2 text-[13px] outline-none focus:ring-1 focus:ring-inset focus:ring-brand disabled:cursor-default";
-
-        return column.Type switch
-        {
-            ColumnType.Status => baseCell + " " + StatusClass(value),
-            ColumnType.Date => baseCell + " bg-transparent tabular-nums text-ink-soft",
-            ColumnType.Number => baseCell + " bg-transparent text-right tabular-nums",
-            ColumnType.People => baseCell + " bg-transparent text-ink-soft",
-            ColumnType.Dropdown => baseCell + " bg-transparent text-ink-soft",
-            _ => baseCell + " bg-transparent"
-        };
-    }
-
-    /// <summary>
-    /// Statuses are solid fills, like a board's status column. Text is white on the darker
-    /// fills and ink on the amber one, because white on #FDAB3D is only 1.9:1.
-    /// </summary>
-    private static string StatusClass(string? value) => (value ?? string.Empty).Trim().ToLowerInvariant() switch
-    {
-        "done" => "mx-1 rounded-sm bg-status-done text-center font-medium text-ink",
-        "stuck" => "mx-1 rounded-sm bg-status-stuck text-center font-medium text-white",
-        "working on it" => "mx-1 rounded-sm bg-status-working text-center font-medium text-ink",
-        "not started" => "mx-1 rounded-sm bg-status-idle text-center font-medium text-ink",
-        "review" => "mx-1 rounded-sm bg-status-review text-center font-medium text-white",
-        _ => "mx-1 rounded-sm bg-status-info/15 text-center font-medium text-ink"
-    };
-
-    /// <summary>The group's own colour, used for the heading bar. Unknown names fall back to blue.</summary>
-    private static string GroupHex(string colour) => colour switch
-    {
-        "amber" => "#FDAB3D",
-        "teal" => "#00C875",
-        "slate" => "#579BFC",
-        "violet" => "#A25DDC",
-        "rose" => "#E2445C",
-        _ => "#579BFC"
-    };
-
-    /// <summary>A 6% wash of the group colour, so the heading reads as a band without shouting.</summary>
-    private static string Tint(string colour) => Blend(GroupHex(colour), 0.06m);
-
-    private static string Blend(string hex, decimal amount)
-    {
-        static int Channel(string h, int i) => Convert.ToInt32(h.Substring(1 + (i * 2), 2), 16);
-
-        var r = (int)Math.Round(Channel(hex, 0) * amount + 255 * (1 - amount));
-        var g = (int)Math.Round(Channel(hex, 1) * amount + 255 * (1 - amount));
-        var b = (int)Math.Round(Channel(hex, 2) * amount + 255 * (1 - amount));
-
-        return $"#{r:X2}{g:X2}{b:X2}";
-    }
-
-    /// <summary>A quiet type cue in the column header, the way a board shows column kinds.</summary>
-    private static string ColumnGlyph(ColumnType type) => type switch
-    {
-        ColumnType.Status => "◉",
-        ColumnType.Date => "▤",
-        ColumnType.Number => "#",
-        ColumnType.People => "☺",
-        ColumnType.Dropdown => "▾",
-        _ => "≡"
-    };
-
     /// <summary>A stable key per row, plus the revert revision so a revert forces new DOM.</summary>
     private string RowKey(GridRow row) => row.Key + ":" + _revision;
 
@@ -678,6 +837,12 @@
     {
         if (!CanEdit)
         {
+            return;
+        }
+
+        if (!_pendingNames.ContainsKey(itemId))
+        {
+            // Nothing typed since the last save (or Escape undid it): no write.
             return;
         }
 
@@ -703,6 +868,12 @@
     {
         if (!CanEdit)
         {
+            return;
+        }
+
+        if (!_pendingCells.ContainsKey((itemId, columnId)))
+        {
+            // Nothing typed since the last save (or Escape undid it): no write, no automation.
             return;
         }
 
@@ -757,14 +928,31 @@
     }
 
     /// <summary>
-    /// Enter commits, Escape reverts. Tab is left to the browser so the native focus
-    /// model keeps working — a custom focus model here would break screen readers.
+    /// Enter commits, Escape reverts the focused cell only. Tab is left to the browser so the
+    /// native focus model keeps working — a custom focus model here would break screen readers.
     /// </summary>
     private async Task OnKeyAsync(KeyboardEventArgs args, Guid itemId, Guid columnId)
     {
         if (args.Key == "Escape")
         {
-            await RestoreAsync();
+            if (_module is null)
+            {
+                // No client helper to put the text back: reload the committed values instead.
+                await RestoreAsync();
+                return;
+            }
+
+            // grid.js has already put the committed text back into this input; drop the draft
+            // so the following blur does not save it.
+            if (columnId == Guid.Empty)
+            {
+                _pendingNames.Remove(itemId);
+            }
+            else
+            {
+                _pendingCells.Remove((itemId, columnId));
+            }
+
             return;
         }
 
@@ -818,10 +1006,25 @@
         }
     }
 
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_module is not null)
+            {
+                await _module.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+            // The circuit is gone; nothing to release.
+        }
+    }
+
     /// <summary>
-    /// A single row of the flattened table. Exactly one of <paramref name="Group"/> and
-    /// <paramref name="Item"/> is set; <paramref name="Key"/> must stay stable so Virtualize
-    /// can reuse a row's DOM when the visible window moves.
+    /// A single row of the flattened table: a group band, an item, an item's sub-item panel or
+    /// a group's "add item" row. <paramref name="Key"/> must stay stable so Virtualize can
+    /// reuse a row's DOM when the visible window moves.
     /// </summary>
-    private sealed record GridRow(string Key, GroupView? Group, ItemView? Item, ItemView? PanelFor = null);
+    private sealed record GridRow(string Key, GroupView? Group, ItemView? Item, ItemView? PanelFor = null, GroupView? AddTo = null);
 }

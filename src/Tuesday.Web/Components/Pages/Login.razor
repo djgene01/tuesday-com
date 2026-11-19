@@ -6,21 +6,30 @@
 @attribute [AllowAnonymous]
 @inject SignInManager<ApplicationUser> SignInManager
 @inject NavigationManager Navigation
+@inject IHostEnvironment Environment
 
 <PageTitle>Sign in — Tuesday.com</PageTitle>
 
-<main class="flex min-h-screen items-center justify-center bg-canvas px-4 py-10 font-sans">
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main" class="flex min-h-screen items-center justify-center bg-canvas px-4 py-10 font-sans">
     <section class="w-full max-w-[400px]">
         <div class="mb-6 flex items-center justify-center gap-2">
-            <span class="grid h-9 w-9 place-items-center rounded-lg bg-brand font-display text-base font-bold text-white">T</span>
+            <span class="grid h-9 w-9 place-items-center rounded-control bg-brand font-display text-base font-bold text-white" aria-hidden="true">T</span>
             <span class="font-display text-lg font-semibold tracking-tight text-ink">Tuesday<span class="text-brand">.</span>com</span>
         </div>
 
-        <div class="rounded-xl border border-line bg-surface p-7 shadow-card">
-            <h1 class="font-display text-[22px] font-semibold tracking-tight text-ink">
+        <div class="rounded-card border border-line bg-surface p-7 shadow-card">
+            @if (_requiresTwoFactor)
+            {
+                <span class="mb-3 grid h-10 w-10 place-items-center rounded-full bg-brand-wash text-brand-ink" aria-hidden="true">
+                    <Icon Name="IconName.Shield" Class="h-5 w-5" />
+                </span>
+            }
+            <h1 class="m-0 font-display text-xl font-semibold tracking-tight text-ink">
                 @(_requiresTwoFactor ? "Two-step verification" : "Sign in")
             </h1>
-            <p class="mt-1 text-sm text-ink-soft">
+            <p class="m-0 mt-1 text-sm text-ink-soft">
                 @(_requiresTwoFactor
                     ? "Enter the six-digit code from your authenticator app."
                     : "Use your work account. Access is scoped to your tenant and role.")
@@ -28,7 +37,7 @@
 
             @if (_error is not null)
             {
-                <p class="mt-4 rounded-md border border-status-stuck/30 bg-status-stuck/10 px-3 py-2 text-sm text-status-stuck" role="alert">@_error</p>
+                <Alert Kind="AlertKind.Error" Class="mt-4">@_error</Alert>
             }
 
             @if (!_requiresTwoFactor)
@@ -36,19 +45,17 @@
                 <EditForm Model="Credentials" FormName="login" method="post" OnValidSubmit="SignInAsync" class="mt-5 space-y-4">
                     <DataAnnotationsValidator />
 
-                    <label class="block">
-                        <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Email</span>
-                        <InputText @bind-Value="Credentials.Email" type="email" autocomplete="username" required
-                                   class="h-10 w-full rounded-control border border-line-strong bg-surface px-3 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20" />
-                    </label>
+                    <Field Label="Email">
+                        <InputText @bind-Value="Credentials.Email" type="email" autocomplete="username" required class="ui-input ui-input-lg" />
+                        <ValidationMessage For="() => Credentials.Email" />
+                    </Field>
 
-                    <label class="block">
-                        <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Password</span>
-                        <InputText @bind-Value="Credentials.Password" type="password" autocomplete="current-password" required
-                                   class="h-10 w-full rounded-control border border-line-strong bg-surface px-3 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20" />
-                    </label>
+                    <Field Label="Password">
+                        <InputText @bind-Value="Credentials.Password" type="password" autocomplete="current-password" required class="ui-input ui-input-lg" />
+                        <ValidationMessage For="() => Credentials.Password" />
+                    </Field>
 
-                    <button type="submit" class="ui-btn-primary mt-1 h-10 w-full text-sm">Sign in</button>
+                    <Button Type="submit" Size="ButtonSize.Lg" Block="true" Class="mt-1">Sign in</Button>
                 </EditForm>
             }
             else
@@ -58,20 +65,24 @@
                 <form method="post" action="/login/totp" name="totp" class="mt-5 space-y-4">
                     <AntiforgeryToken />
 
-                    <label class="block">
-                        <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Authenticator code</span>
+                    <Field Label="Authenticator code" Hint="The code changes every 30 seconds.">
                         <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required
-                               class="h-11 w-full rounded-control border border-line-strong bg-surface px-3 text-center text-lg tracking-[0.3em] text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20" />
-                    </label>
+                               autofocus class="ui-input ui-input-code" />
+                    </Field>
 
-                    <button type="submit" class="ui-btn-primary h-10 w-full text-sm">Verify</button>
+                    <Button Type="submit" Size="ButtonSize.Lg" Block="true">Verify</Button>
+                    <a class="block text-center text-sm text-ink-soft no-underline hover:text-ink hover:underline" href="/login">Use a different account</a>
                 </form>
             }
         </div>
 
-        <p class="mt-4 text-center text-[11px] leading-relaxed text-ink-faint">
-            Development accounts: admin@@, member@@, viewer@@, guest@@tuesday.local — password <code class="rounded bg-canvas px-1 py-0.5 text-ink-soft">Tuesday!Demo1</code>.
-        </p>
+        @if (Environment.IsDevelopment())
+        {
+            @* Seeded demo accounts exist only in Development, so the hint does too. *@
+            <p class="mt-4 text-center text-2xs leading-relaxed text-ink-soft">
+                Development accounts: admin@@, member@@, viewer@@, guest@@tuesday.local — password <code class="rounded bg-surface-2 px-1 py-0.5 text-ink">Tuesday!Demo1</code>.
+            </p>
+        }
     </section>
 </main>
 

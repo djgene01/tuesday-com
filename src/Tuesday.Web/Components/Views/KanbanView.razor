@@ -5,13 +5,15 @@
 
 @if (Lanes.Count == 0)
 {
-    <p class="meta">This board has no status column, so it cannot be grouped into lanes.</p>
+    <EmptyState Title="No lanes to show" IconName="IconName.Board">
+        This board has no status column, so it cannot be grouped into lanes.
+    </EmptyState>
 }
 else
 {
     @if (_error is not null)
     {
-        <p class="alert alert-bad" role="alert">@_error</p>
+        <Alert Kind="AlertKind.Error" Class="mb-3">@_error</Alert>
     }
 
     <div class="kanban" role="list" aria-label="Board by status">
@@ -25,9 +27,9 @@ else
                      @ondragleave="() => _hover = null"
                      @ondrop="() => DropAsync(lane)">
                 <header class="lane-head">
-                    <span class="lane-swatch status-@Slug(lane.Label)" aria-hidden="true"></span>
+                    <span class="lane-swatch" style="background: @StatusPalette.StatusFill(lane.Label)" aria-hidden="true"></span>
                     <h2>@lane.Label</h2>
-                    <span class="tag">@lane.Cards.Count</span>
+                    <span class="ui-pill ui-pill-neutral ml-auto">@lane.Cards.Count</span>
                 </header>
 
                 <div class="lane-cards">
@@ -36,11 +38,13 @@ else
                         <article class="kcard"
                                  draggable="@(CanEdit ? "true" : "false")"
                                  tabindex="0"
-                                 aria-label="@($"{card.Name}, {lane.Label}. Alt plus left or right arrow moves it.")"
+                                 aria-label="@($"{card.Name}, {lane.Label}.{(CanEdit ? " Alt plus left or right arrow moves it." : string.Empty)}")"
                                  @ondragstart="() => _dragging = card.ItemId"
                                  @ondragend="() => _dragging = null"
                                  @onkeydown="e => OnCardKeyAsync(e, lane, card)">
-                            <p class="kcard-name">@card.Name</p>
+                            <p class="kcard-name">
+                                <a href="@($"/board/{Board.Id}/item/{card.ItemId}")" draggable="false">@card.Name</a>
+                            </p>
                             @if (card.Cells.Count > 0)
                             {
                                 <p class="kcard-meta">@string.Join(" · ", card.Cells.Values.Where(value => !string.IsNullOrWhiteSpace(value)))</p>
@@ -50,7 +54,7 @@ else
 
                     @if (lane.Cards.Count == 0)
                     {
-                        <p class="lane-empty">Drop an item here</p>
+                        <p class="lane-empty">@(CanEdit ? "Drop an item here" : "Nothing here")</p>
                     }
                 </div>
             </section>
@@ -137,7 +141,4 @@ else
 
         await OnChanged.InvokeAsync();
     }
-
-    private static string Slug(string label) =>
-        label.ToLowerInvariant().Replace(' ', '-');
 }

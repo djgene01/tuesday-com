@@ -36,8 +36,8 @@
             </p>
 
             <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
-                <a class="ui-btn-primary !h-11 !px-6 text-[14px]" href="/workspace">Get started free</a>
-                <a class="ui-btn-ghost !h-11 !px-6 text-[14px]" href="#context">See how it works</a>
+                <Button Href="/workspace" Size="ButtonSize.Lg" Class="h-11 rounded-pill px-6">Get started free</Button>
+                <Button Href="#context" Variant="ButtonVariant.Ghost" Size="ButtonSize.Lg" Class="h-11 rounded-pill px-6">See how it works</Button>
             </div>
 
             <p class="mt-4 text-[12px] text-ink-faint">
@@ -73,9 +73,9 @@
 </section>
 
 <section id="status" class="mx-auto mt-20 max-w-[1180px] px-5" aria-labelledby="status-title">
-    <div class="reveal flex flex-wrap items-center gap-x-6 gap-y-3 rounded-[2rem] border border-line bg-surface px-6 py-4">
+    <div class="reveal flex flex-wrap items-center gap-x-6 gap-y-3 rounded-marketing border border-line bg-surface px-6 py-4">
         <h2 id="status-title" class="text-[13px] font-semibold text-ink">Live status</h2>
-        <span class="ui-pill @(_report.Status == HealthStatus.Healthy ? "bg-sage text-[#2f5d43]" : "bg-brand-tint text-ink")">
+        <span class="ui-pill @(_report.Status == HealthStatus.Healthy ? "ui-pill-ok" : "ui-pill-warn")">
             @_report.Status
         </span>
         @foreach (var entry in _report.Entries)
@@ -105,12 +105,12 @@
     <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         @foreach (var card in Cards)
         {
-            <a class="reveal group flex h-full flex-col rounded-[2rem] border border-line bg-surface p-6 no-underline transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-card)]"
+            <a class="reveal group flex h-full flex-col rounded-marketing border border-line bg-surface p-6 no-underline transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-card)]"
                href="/workspace">
-                <span class="grid h-11 w-11 place-items-center rounded-[1.1rem] text-[18px]" style="background:@card.Tint" aria-hidden="true">@card.Glyph</span>
+                <span class="grid h-11 w-11 place-items-center rounded-[1.1rem] text-ink" style="background:@card.Tint" aria-hidden="true"><Icon Name="card.Icon" Class="h-5 w-5" /></span>
                 <h3 class="mt-5 text-[16px] font-semibold text-ink">@card.Title</h3>
                 <p class="mt-1.5 text-[13px] leading-relaxed text-ink-soft">@card.Body</p>
-                <span class="mt-auto pt-4 text-[12px] font-medium text-brand-ink group-hover:underline">Open the board →</span>
+                <span class="mt-auto inline-flex items-center gap-1 pt-4 text-[12px] font-medium text-brand-ink group-hover:underline">Open the board <Icon Name="IconName.ChevronRight" Class="h-3.5 w-3.5" /></span>
             </a>
         }
     </div>
@@ -198,9 +198,8 @@ curl -fsS http://your-host:8080/health/ready</code></pre>
                 restore is rehearsed, not assumed.
             </p>
             <div class="mt-6 flex flex-wrap gap-3">
-                <a class="ui-btn-ghost !h-10 !px-5 text-[13px]" href="/health/ready">Readiness probe</a>
-                <a class="ui-btn-ghost !h-10 !px-5 text-[13px]" href="/openapi/v1.json">OpenAPI document</a>
-                <a class="ui-btn-ghost !h-10 !px-5 text-[13px]" href="/.well-known/openid-configuration">OIDC discovery</a>
+                <Button Href="/health/ready" Variant="ButtonVariant.Ghost" Size="ButtonSize.Lg" Class="rounded-pill">Readiness probe</Button>
+                <Button Href="/openapi/v1.json" Variant="ButtonVariant.Ghost" Size="ButtonSize.Lg" Class="rounded-pill">API reference</Button>
             </div>
         </div>
     </div>
@@ -209,7 +208,7 @@ curl -fsS http://your-host:8080/health/ready</code></pre>
 <section class="mx-auto mt-28 max-w-[1180px] px-5">
     <div class="reveal relative overflow-hidden rounded-[3rem] border border-line bg-lavender/60 px-6 py-14 text-center sm:px-12">
         <img src="/img/cta-team.png" width="1024" height="768" loading="lazy" decoding="async" alt=""
-             style="height:auto;aspect-ratio:4 / 3" class="pointer-events-none mx-auto mb-8 w-[220px] rounded-[2rem] object-cover" aria-hidden="true" />
+             style="height:auto;aspect-ratio:4 / 3" class="pointer-events-none mx-auto mb-8 w-[220px] rounded-marketing object-cover" aria-hidden="true" />
         <h2 class="mx-auto max-w-[620px] font-display text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.02] tracking-[-0.03em] text-ink">
             Start with one board.<br />
             <span class="font-hand text-[clamp(2.2rem,4.6vw,3.4rem)] text-brand-ink">Grow it when it earns it.</span>
@@ -219,16 +218,16 @@ curl -fsS http://your-host:8080/health/ready</code></pre>
             for a team of four or a department of four hundred.
         </p>
         <div class="mt-8 flex flex-wrap justify-center gap-3">
-            <a class="ui-btn-primary !h-11 !px-6 text-[14px]" href="/workspace">Open your workspace</a>
-            <a class="ui-btn-ghost !h-11 !px-6 text-[14px]" href="/login">Sign in</a>
+            <Button Href="/workspace" Size="ButtonSize.Lg" Class="h-11 rounded-pill px-6">Open your workspace</Button>
+            <Button Href="/login" Variant="ButtonVariant.Ghost" Size="ButtonSize.Lg" Class="h-11 rounded-pill px-6">Sign in</Button>
         </div>
     </div>
 </section>
 
 <section class="mx-auto mt-16 max-w-[1180px] px-5">
-    <details class="reveal group rounded-[2rem] border border-line bg-surface">
+    <details class="reveal group rounded-marketing border border-line bg-surface">
         <summary class="flex cursor-pointer list-none items-center gap-2 px-6 py-4 text-[13px] font-medium text-ink-soft marker:hidden">
-            <span class="inline-block text-[10px] transition-transform group-open:rotate-90" aria-hidden="true">▸</span>
+            <Icon Name="IconName.ChevronRight" Class="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
             System details
             <span class="ml-1 text-ink-faint">— runtime, start time, probe endpoints</span>
         </summary>
@@ -267,15 +266,15 @@ curl -fsS http://your-host:8080/health/ready</code></pre>
         _checkedAt = DateTimeOffset.UtcNow;
     }
 
-    private sealed record Card(string Glyph, string Title, string Body, string Tint);
+    private sealed record Card(IconName Icon, string Title, string Body, string Tint);
 
     private static readonly Card[] Cards =
     [
-        new("◎", "Projects & delivery", "Plans, milestones and risks on one board, with a timeline view that travels.", "#E8EFE8"),
-        new("✳", "Marketing", "Campaigns and creative requests, reviewed in the same place the work lives.", "#FFB7B2"),
-        new("◈", "Operations", "Repeatable processes with automations that fire on status changes.", "#EFEDF4"),
-        new("⌘", "IT & support", "Tickets with typed columns, owners and due dates — and an API to feed them.", "#E8EFE8"),
-        new("◍", "Hiring", "Roles, candidates and interviews, kept out of a spreadsheet.", "#EFEDF4"),
-        new("↗", "Sales pipeline", "Deals as rows, stages as groups, follow-ups as automations.", "#FFB7B2")
+        new(IconName.Calendar, "Projects & delivery", "Plans, milestones and risks on one board, with a timeline view that travels.", "var(--color-sage)"),
+        new(IconName.Sparkle, "Marketing", "Campaigns and creative requests, reviewed in the same place the work lives.", "var(--color-peach)"),
+        new(IconName.Status, "Operations", "Repeatable processes with automations that fire on status changes.", "var(--color-lavender)"),
+        new(IconName.Inbox, "IT & support", "Tickets with typed columns, owners and due dates — and an API to feed them.", "var(--color-sage)"),
+        new(IconName.Users, "Hiring", "Roles, candidates and interviews, kept out of a spreadsheet.", "var(--color-lavender)"),
+        new(IconName.Chart, "Sales pipeline", "Deals as rows, stages as groups, follow-ups as automations.", "#FFB7B2")
     ];
 }

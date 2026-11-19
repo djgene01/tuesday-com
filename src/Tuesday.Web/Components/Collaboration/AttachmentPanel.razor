@@ -8,43 +8,68 @@
 @inject AttachmentLinks Links
 @inject ITenantContext Tenant
 @inject TenantContextBootstrapper Bootstrapper
+@inject ToastService Toasts
+@inject ILogger<AttachmentPanel> Logger
 
-<section class="ui-card mt-4 overflow-hidden" aria-label="Attachments">
-    <header class="flex items-center gap-3 border-b border-line px-4 py-3">
-        <h2 class="font-display text-[15px] font-semibold text-ink">Attachments</h2>
-        <p class="text-xs text-ink-faint">@(_rows is null ? "Loading" : $"{_rows.Count} file{(_rows.Count == 1 ? string.Empty : "s")}")</p>
+<section class="ui-card mt-4 overflow-hidden" aria-labelledby="attachments-title">
+    <header class="ui-card-head">
+        <h2 id="attachments-title" class="ui-card-title">Attachments</h2>
+        <span class="ui-pill ui-pill-neutral">@(_rows is null ? "…" : _rows.Count.ToString(System.Globalization.CultureInfo.InvariantCulture))</span>
     </header>
 
     @if (CanEdit)
     {
         <div class="border-b border-line px-4 py-3">
             <label class="block">
-                <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Add a file (up to 25 MB)</span>
-                <InputFile OnChange="UploadAsync"
-                           class="block w-full cursor-pointer rounded-control border border-dashed border-line-strong bg-canvas px-3 py-2 text-sm text-ink-soft file:mr-3 file:rounded-full file:border-0 file:bg-brand-tint file:px-3 file:py-1 file:text-[12px] file:font-medium file:text-brand-ink hover:border-brand/40" />
+                <span class="ui-label">Add a file <span class="font-normal text-ink-soft">(up to 25 MB)</span></span>
+                <InputFile OnChange="UploadAsync" disabled="@_busy"
+                           class="block w-full cursor-pointer rounded-control border border-dashed border-line-strong bg-surface-2 px-3 py-2 text-sm text-ink-soft file:mr-3 file:cursor-pointer file:rounded-control file:border-0 file:bg-brand-wash file:px-3 file:py-1 file:font-[inherit] file:text-xs file:font-medium file:text-brand-ink hover:border-brand/40" />
             </label>
-            <p class="mt-1.5 text-[11px] text-ink-faint">Files are private to this item. Links expire after one hour.</p>
+            <p class="m-0 mt-1.5 flex items-center gap-2 text-xs text-ink-soft">
+                @if (_busy)
+                {
+                    <Spinner Label="Uploading…" Class="h-3.5 w-3.5" />
+                }
+                else
+                {
+                    <text>Files are private to this item. Download links expire after one hour.</text>
+                }
+            </p>
         </div>
     }
 
     @if (_error is not null)
     {
-        <p class="border-b border-line bg-status-stuck/10 px-4 py-2 text-sm text-status-stuck" role="alert">@_error</p>
+        <div class="border-b border-line px-4 py-3">
+            <Alert Kind="AlertKind.Error">@_error</Alert>
+        </div>
     }
 
-    @if (_rows is { Count: 0 })
+    @if (_rows is null)
     {
-        <p class="px-4 py-6 text-center text-sm text-ink-soft">No files yet.</p>
+        <div class="px-4 py-4"><Skeleton Lines="2" /></div>
     }
-    else if (_rows is not null)
+    else if (_rows.Count == 0)
     {
-        <ul class="file-list divide-y divide-line">
+        <EmptyState Title="No files yet" IconName="IconName.File" Bare="true" Compact="true">
+            @(CanEdit ? "Attach briefs, screenshots or exports — anyone who can see this item can download them." : "Nobody has attached a file to this item.")
+        </EmptyState>
+    }
+    else
+    {
+        <ul class="m-0 list-none divide-y divide-line p-0">
             @foreach (var row in _rows)
             {
                 <li class="flex flex-wrap items-center gap-3 px-4 py-2.5">
-                    <span class="text-[13px] font-medium text-ink">@row.FileName</span>
-                    <span class="text-[11px] text-ink-faint">@Size(row.ByteSize) · @row.CreatedAt.ToLocalTime().ToString("d MMM, HH:mm")</span>
-                    <a class="ui-btn-ghost ml-auto !h-7 !px-2.5 text-[11px]" href="@DownloadHref(row)" download>Download</a>
+                    <span class="grid h-8 w-8 shrink-0 place-items-center rounded-control bg-surface-2 text-ink-soft ring-1 ring-inset ring-line" aria-hidden="true">
+                        <Icon Name="IconName.File" Class="h-4 w-4" />
+                    </span>
+                    <span class="min-w-0 flex-1">
+                        <span class="block truncate text-sm font-medium text-ink">@row.FileName</span>
+                        <span class="block text-xs text-ink-soft">@Size(row.ByteSize) · @row.CreatedAt.ToLocalTime().ToString("d MMM, HH:mm")</span>
+                    </span>
+                    <Button Href="@DownloadHref(row)" Variant="ButtonVariant.Ghost" Size="ButtonSize.Sm" download
+                            aria-label="@($"Download {row.FileName}")">Download</Button>
                 </li>
             }
         </ul>
@@ -98,12 +123,18 @@
             }
 
             await LoadAsync();
+            Toasts.Success($"\"{file.Name}\" attached.");
         }
-        catch (Exception exception)
+        catch (InvalidOperationException)
         {
-            _error = exception is InvalidOperationException
-                ? "That file is larger than the 25 MB limit."
-                : "The upload failed: " + exception.Message;
+            _error = "That file is larger than the 25 MB limit.";
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // The exception text can carry paths and provider detail; the person gets a plain
+            // message and the log gets the specifics.
+            Logger.LogError(exception, "Attachment upload failed for item {ItemId}.", ItemId);
+            _error = "The upload failed. Try again, or try a smaller file.";
         }
         finally
         {
@@ -114,10 +145,18 @@
     private string DownloadHref(AttachmentRow row) =>
         $"/attachments/{row.Id:D}?t={Links.Create(row.Id, BoardId, ItemId, TimeSpan.FromHours(1))}";
 
-    private static string Size(long bytes) => bytes switch
+    private const double Kilobyte = 1024.0;
+    private const double Megabyte = 1024.0 * 1024.0;
+
+    // Written with if/else rather than relational patterns: some Razor compiler builds read
+    // "< 1024" inside a switch expression as the start of a markup tag.
+    private static string Size(long bytes)
     {
-        < 1024 => $"{bytes} B",
-        < 1024 * 1024 => $"{bytes / 1024.0:0.#} KB",
-        _ => $"{bytes / (1024.0 * 1024.0):0.#} MB"
-    };
+        if (bytes >= Megabyte)
+        {
+            return $"{bytes / Megabyte:0.#} MB";
+        }
+
+        return bytes >= Kilobyte ? $"{bytes / Kilobyte:0.#} KB" : $"{bytes} B";
+    }
 }

@@ -5,6 +5,7 @@
 @inject SubitemColumnService Columns
 @inject ItemEditor Editor
 @inject TenantContextBootstrapper Bootstrapper
+@inject ToastService Toasts
 
 @*
     Standalone editor for the sub-item surface's columns. The parent board's columns are not
@@ -12,145 +13,130 @@
 *@
 
 <div class="ui-card overflow-hidden">
-    <header class="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
-        <div>
-            <h2 class="font-display text-[15px] font-semibold text-ink">Existing columns</h2>
-            <p class="mt-0.5 text-[12px] text-ink-soft">
+    <header class="ui-card-head">
+        <div class="min-w-0 flex-1">
+            <h2 class="ui-card-title">Existing columns</h2>
+            <p class="m-0 mt-0.5 text-xs text-ink-soft">
                 These belong to sub-items only. Renaming or deleting one never changes this board's own columns.
             </p>
         </div>
-        <span class="ml-auto text-xs text-ink-faint">@_columns.Count</span>
+        <span class="ui-pill ui-pill-neutral">@_columns.Count</span>
     </header>
 
     @if (_error is not null)
     {
-        <p class="border-b border-line bg-status-stuck/10 px-4 py-2 text-sm text-status-stuck" role="alert">@_error</p>
+        <div class="border-b border-line px-4 py-3"><Alert Kind="AlertKind.Error">@_error</Alert></div>
     }
 
-    @if (_columns.Count == 0)
+    @if (!_loaded)
     {
-        <div class="px-4 py-5">
-            <p class="text-sm text-ink-soft">No sub-item columns yet. Add one below, or start from a copy of this board's columns.</p>
-
-            @if (CanEdit)
-            {
-                <button type="button"
-                        class="mt-3 rounded-control border border-line-strong bg-surface px-3 py-1.5 text-[13px] font-medium text-ink transition hover:border-brand hover:text-brand disabled:opacity-50"
-                        disabled="@_busy"
-                        @onclick="CopyAsync">
-                    Copy columns from this board
-                </button>
-            }
-        </div>
+        <div class="px-4 py-4"><Skeleton Lines="3" /></div>
+    }
+    else if (_columns.Count == 0)
+    {
+        <EmptyState Title="No sub-item columns yet" IconName="IconName.Subitem" Bare="true" Compact="true">
+            <ChildContent>Add one below, or start from a copy of this board's columns.</ChildContent>
+            <Actions>
+                @if (CanEdit)
+                {
+                    <Button Variant="ButtonVariant.Ghost" Busy="_busy" @onclick="CopyAsync">Copy columns from this board</Button>
+                }
+            </Actions>
+        </EmptyState>
     }
     else
     {
-        <table class="w-full border-collapse text-[13px]">
-            <thead>
-                <tr class="border-b border-line text-[10px] uppercase tracking-[0.06em] text-ink-faint">
-                    <th class="px-4 py-2 text-left font-semibold">Title</th>
-                    <th class="w-40 px-2 py-2 text-left font-semibold">Type</th>
-                    <th class="w-40 px-2 py-2 text-right font-semibold">Order</th>
-                    <th class="w-32 px-4 py-2 text-right font-semibold">Remove</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var (column, index) in _columns.Select((c, i) => (c, i)))
-                {
-                    <tr class="border-b border-line/70 last:border-0">
-                        <td class="px-4 py-1.5">
-                            <input class="h-8 w-full max-w-sm rounded-control border border-transparent bg-transparent px-1 text-[13px] text-ink outline-none focus:border-brand focus:bg-surface"
-                                   aria-label="@($"Column title: {column.Title}")"
-                                   value="@column.Title"
-                                   disabled="@(!CanEdit)"
-                                   @onchange="e => RenameAsync(column.Id, e.Value?.ToString())" />
-                        </td>
-                        <td class="px-2 py-1.5 text-[12px] text-ink-soft">@TypeLabel(column.Type)</td>
-                        <td class="px-2 py-1.5 text-right">
-                            @if (CanEdit)
-                            {
-                                <span class="inline-flex">
-                                    <button type="button" class="grid h-7 w-7 place-items-center rounded text-ink-faint hover:bg-brand-tint hover:text-brand disabled:opacity-40"
-                                            aria-label="@($"Move {column.Title} left")"
-                                            disabled="@(index == 0 || _busy)"
-                                            @onclick="() => MoveAsync(column.Id, -1)">↑</button>
-                                    <button type="button" class="grid h-7 w-7 place-items-center rounded text-ink-faint hover:bg-brand-tint hover:text-brand disabled:opacity-40"
-                                            aria-label="@($"Move {column.Title} right")"
-                                            disabled="@(index == _columns.Count - 1 || _busy)"
-                                            @onclick="() => MoveAsync(column.Id, 1)">↓</button>
-                                </span>
-                            }
-                        </td>
-                        <td class="px-4 py-1.5 text-right">
-                            @if (CanEdit)
-                            {
-                                if (_confirming == column.Id)
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse text-sm">
+                <thead>
+                    <tr class="border-b border-line bg-surface-2 text-xs text-ink-soft">
+                        <th class="px-4 py-2 text-left font-medium" scope="col">Title</th>
+                        <th class="w-40 px-2 py-2 text-left font-medium" scope="col">Type</th>
+                        <th class="w-28 px-2 py-2 text-right font-medium" scope="col">Order</th>
+                        <th class="w-48 px-4 py-2 text-right font-medium" scope="col"><span class="sr-only">Remove</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var (column, index) in _columns.Select((c, i) => (c, i)))
+                    {
+                        <tr class="border-b border-line last:border-0">
+                            <td class="px-4 py-1.5">
+                                <input class="ui-input ui-input-sm max-w-sm border-transparent bg-transparent hover:border-line-strong"
+                                       aria-label="@($"Column title: {column.Title}")"
+                                       value="@column.Title"
+                                       disabled="@(!CanEdit)"
+                                       @onchange="e => RenameAsync(column.Id, e.Value?.ToString())" />
+                            </td>
+                            <td class="px-2 py-1.5 text-xs text-ink-soft">
+                                <span class="inline-flex items-center gap-1.5"><Icon Name="@ColumnIcons.For(column.Type)" Class="h-3.5 w-3.5" />@TypeLabel(column.Type)</span>
+                            </td>
+                            <td class="px-2 py-1.5 text-right">
+                                @if (CanEdit)
                                 {
-                                    <span class="inline-flex items-center gap-1">
-                                        <button type="button" class="rounded-control bg-status-stuck px-2 py-1 text-[11px] font-semibold text-white"
-                                                disabled="@_busy"
-                                                @onclick="() => DeleteAsync(column.Id)">
-                                            Delete values too
-                                        </button>
-                                        <button type="button" class="rounded-control border border-line-strong px-2 py-1 text-[11px] text-ink-soft"
-                                                @onclick="() => _confirming = null">
-                                            Cancel
-                                        </button>
+                                    <span class="inline-flex">
+                                        <Button Variant="ButtonVariant.Quiet" Size="ButtonSize.Sm" IconOnly="true"
+                                                aria-label="@($"Move {column.Title} up")"
+                                                Disabled="@(index == 0 || _busy)"
+                                                @onclick="() => MoveAsync(column.Id, -1)"><Icon Name="IconName.ArrowUp" Class="h-3.5 w-3.5" /></Button>
+                                        <Button Variant="ButtonVariant.Quiet" Size="ButtonSize.Sm" IconOnly="true"
+                                                aria-label="@($"Move {column.Title} down")"
+                                                Disabled="@(index == _columns.Count - 1 || _busy)"
+                                                @onclick="() => MoveAsync(column.Id, 1)"><Icon Name="IconName.ArrowDown" Class="h-3.5 w-3.5" /></Button>
                                     </span>
                                 }
-                                else
+                            </td>
+                            <td class="px-4 py-1.5 text-right">
+                                @if (CanEdit)
                                 {
-                                    <button type="button" class="rounded-control px-2 py-1 text-[11px] font-medium text-ink transition hover:bg-status-stuck/10 hover:text-status-stuck"
-                                            aria-label="@($"Remove column {column.Title}")"
-                                            @onclick="() => _confirming = column.Id">
-                                        Remove
-                                    </button>
+                                    if (_confirming == column.Id)
+                                    {
+                                        <span class="inline-flex items-center gap-1" role="group" aria-label="@($"Confirm removing {column.Title}")">
+                                            <Button Variant="ButtonVariant.Danger" Size="ButtonSize.Sm" Busy="_busy"
+                                                    @onclick="() => DeleteAsync(column.Id)">Delete values too</Button>
+                                            <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Sm"
+                                                    @onclick="() => _confirming = null">Cancel</Button>
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <Button Variant="ButtonVariant.QuietDanger" Size="ButtonSize.Sm" IconStart="IconName.Trash"
+                                                aria-label="@($"Remove column {column.Title}")"
+                                                @onclick="() => _confirming = column.Id">Remove</Button>
+                                    }
                                 }
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     }
 
     @if (CanEdit)
     {
-        <div class="flex flex-wrap items-end gap-3 border-t border-line bg-canvas/50 px-4 py-3">
-            <label class="block">
-                <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">New column</span>
-                <input type="text"
-                       class="h-9 w-64 rounded-control border border-line-strong bg-surface px-2 text-[13px] text-ink outline-none focus:border-brand"
+        <form class="flex flex-wrap items-end gap-3 border-t border-line bg-surface-2/60 px-4 py-3" @onsubmit="AddAsync" @onsubmit:preventDefault>
+            <Field Label="New column" Class="w-full sm:w-64">
+                <input type="text" class="ui-input"
                        placeholder="Column title"
-                       aria-label="New column title"
-                       @onchange="e => _newTitle = e.Value?.ToString() ?? string.Empty" />
-            </label>
+                       @bind="_newTitle" @bind:event="oninput" />
+            </Field>
 
-            <label class="block">
-                <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Type</span>
-                <select class="h-9 rounded-control border border-line-strong bg-surface px-2 text-[13px] text-ink outline-none focus:border-brand"
-                        aria-label="New column type"
+            <Field Label="Type" Class="w-full sm:w-44">
+                <select class="ui-select"
                         @onchange="e => _newType = ParseType(e.Value?.ToString())">
                     @foreach (var type in Types)
                     {
                         <option value="@type.ToString()" selected="@(_newType == type)">@TypeLabel(type)</option>
                     }
                 </select>
-            </label>
+            </Field>
 
-            <button type="button" class="ui-btn-primary !h-9 !px-4 text-[13px] disabled:opacity-50"
-                    disabled="@_busy"
-                    @onclick="AddAsync">
-                Add column
-            </button>
+            <Button Type="submit" IconStart="IconName.Plus" Busy="_adding" Disabled="@(_busy || string.IsNullOrWhiteSpace(_newTitle))">Add column</Button>
 
-            <button type="button"
-                    class="ml-auto rounded-control border border-line-strong bg-surface px-3 py-1.5 text-[12px] font-medium text-ink transition hover:border-brand hover:text-brand disabled:opacity-50"
-                    disabled="@(_busy || _columns.Count == 0)"
-                    @onclick="CopyAsync">
-                Copy any missing columns from this board
-            </button>
-        </div>
+            <Button Variant="ButtonVariant.Ghost" Class="sm:ml-auto"
+                    Disabled="@(_busy || _columns.Count == 0)"
+                    @onclick="CopyAsync">Copy any missing columns from this board</Button>
+        </form>
     }
 </div>
 
@@ -179,6 +165,8 @@
     private Guid? _confirming;
     private string? _error;
     private bool _busy;
+    private bool _adding;
+    private bool _loaded;
 
     protected override async Task OnInitializedAsync()
     {
@@ -192,20 +180,23 @@
 
         _columns.Clear();
         _columns.AddRange(columns);
+        _loaded = true;
     }
 
     private async Task AddAsync()
     {
-        if (_busy)
+        if (_busy || string.IsNullOrWhiteSpace(_newTitle))
         {
             return;
         }
 
         _busy = true;
+        _adding = true;
 
         try
         {
-            var result = await Columns.AddAsync(BoardId, _newTitle, _newType);
+            var title = _newTitle.Trim();
+            var result = await Columns.AddAsync(BoardId, title, _newType);
 
             if (!result.Succeeded)
             {
@@ -214,12 +205,15 @@
             }
 
             _error = null;
+            // Bound to the input, so clearing it here empties the box for the next column.
             _newTitle = string.Empty;
             await LoadAsync();
+            Toasts.Success($"Column \"{title}\" added.");
         }
         finally
         {
             _busy = false;
+            _adding = false;
         }
     }
 

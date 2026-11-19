@@ -1,0 +1,28 @@
+<nav aria-label="Breadcrumb" class="mb-1.5">
+    <ol class="m-0 flex list-none flex-wrap items-center gap-1 p-0 text-xs text-ink-soft">
+        @for (var i = 0; i < Items.Count; i++)
+        {
+            var crumb = Items[i];
+            var last = i == Items.Count - 1;
+            <li class="flex min-w-0 items-center gap-1">
+                @if (crumb.Href is not null && !last)
+                {
+                    <a class="truncate text-ink-soft no-underline hover:text-ink hover:underline" href="@crumb.Href">@crumb.Label</a>
+                }
+                else
+                {
+                    <span class="truncate text-ink" aria-current="@(last ? "page" : null)">@crumb.Label</span>
+                }
+                @if (!last)
+                {
+                    <Icon Name="IconName.ChevronRight" Class="h-3 w-3 shrink-0 text-ink-soft" />
+                }
+            </li>
+        }
+    </ol>
+</nav>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<Crumb> Items { get; set; } = [];
+}

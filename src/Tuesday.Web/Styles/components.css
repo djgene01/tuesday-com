@@ -1,0 +1,235 @@
+/*
+ * Tuesday.com component classes. Imported by app.css between the theme and the utilities, so
+ * any utility written on the same element wins on source order. Keep these as the shapes the
+ * Razor primitives in Components/Ui/ render; one-off styling belongs in utilities.
+ */
+
+/* --- Component layer ---------------------------------------------------------------- */
+/* Plain rules, so they sit in the same unlayered cascade as the utilities. Size modifiers
+   come after the variants so they win on source order. */
+
+/* Buttons. Every variant carries the base shape, so `class="ui-btn-primary"` alone is a
+   complete button and the Button primitive only has to pick a variant and a size. */
+.ui-btn,
+.ui-btn-primary,
+.ui-btn-secondary,
+.ui-btn-ghost,
+.ui-btn-quiet,
+.ui-btn-danger {
+  @apply inline-flex h-8 shrink-0 cursor-pointer select-none items-center justify-center gap-1.5
+         whitespace-nowrap rounded-control border border-transparent px-3.5 text-sm font-medium
+         leading-none no-underline transition-colors duration-150;
+  font-family: inherit;
+}
+
+.ui-btn:disabled,
+.ui-btn-primary:disabled,
+.ui-btn-secondary:disabled,
+.ui-btn-ghost:disabled,
+.ui-btn-quiet:disabled,
+.ui-btn-danger:disabled,
+a[aria-disabled="true"][class*="ui-btn"] {
+  @apply pointer-events-none opacity-50;
+}
+
+.ui-btn { @apply bg-surface text-ink; }
+
+.ui-btn-primary {
+  @apply bg-brand text-white hover:bg-brand-hover hover:text-white active:bg-brand-press;
+}
+
+.ui-btn-secondary {
+  @apply bg-peach text-ink hover:brightness-95 active:brightness-90;
+}
+
+.ui-btn-ghost {
+  @apply border-line-strong bg-surface text-ink hover:border-ink-soft/40 hover:bg-surface-2 hover:text-ink;
+}
+
+.ui-btn-quiet {
+  @apply bg-transparent text-ink-soft hover:bg-surface-2 hover:text-ink;
+}
+
+.ui-btn-danger {
+  @apply bg-bad text-white hover:bg-[#9c1f33] hover:text-white active:bg-[#861a2b];
+}
+
+.ui-btn-sm { @apply h-7 gap-1 px-2.5 text-xs; }
+.ui-btn-md { @apply h-8 px-3.5 text-sm; }
+.ui-btn-lg { @apply h-10 px-4 text-base; }
+.ui-btn-icon { @apply w-8 px-0; }
+.ui-btn-icon.ui-btn-sm { @apply w-7 px-0; }
+.ui-btn-icon.ui-btn-lg { @apply w-10 px-0; }
+.ui-btn-block { @apply w-full; }
+
+/* Danger as a quiet text action (row "Delete", "Revoke"): neutral until hovered. */
+.ui-btn-quiet.is-danger { @apply hover:bg-bad-bg hover:text-bad; }
+
+/* Form controls. Usable on InputText/InputSelect and plain inputs alike. */
+.ui-label {
+  @apply mb-1 block text-xs font-medium text-ink;
+}
+
+.ui-hint { @apply mt-1 block text-xs text-ink-soft; }
+.ui-error,
+.validation-message { @apply mt-1 block text-xs font-medium text-bad; }
+
+.ui-input,
+.ui-select,
+.ui-textarea {
+  @apply block h-9 w-full rounded-control border border-line-strong bg-surface px-3 text-sm text-ink
+         transition-colors duration-150 placeholder:text-ink-soft hover:border-ink-soft/50;
+  font-family: inherit;
+}
+
+.ui-textarea { @apply h-auto min-h-[5rem] resize-y py-2 leading-relaxed; }
+
+.ui-select {
+  @apply appearance-none pr-8;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2378716c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right 0.6rem center;
+  background-repeat: no-repeat;
+  background-size: 1rem;
+}
+
+.ui-input:focus-visible,
+.ui-select:focus-visible,
+.ui-textarea:focus-visible {
+  @apply border-brand;
+  outline: 2px solid color-mix(in srgb, var(--color-brand) 35%, transparent);
+  outline-offset: 0;
+}
+
+.ui-input:disabled,
+.ui-select:disabled,
+.ui-textarea:disabled { @apply cursor-not-allowed bg-surface-2 text-ink-soft; }
+
+.ui-input.invalid,
+.ui-select.invalid,
+.ui-textarea.invalid,
+.ui-input[aria-invalid="true"] { @apply border-bad; }
+
+.ui-input-sm { @apply h-8 px-2.5 text-sm; }
+.ui-input-lg { @apply h-10 text-base; }
+.ui-input-code { @apply h-11 text-center text-lg tracking-[0.3em] tabular-nums; }
+
+.ui-check { @apply h-4 w-4 cursor-pointer rounded accent-brand; }
+
+/* Surfaces */
+.ui-card {
+  @apply rounded-card border border-line bg-surface;
+}
+
+.ui-card-head {
+  @apply flex flex-wrap items-center gap-3 border-b border-line px-4 py-3;
+}
+
+.ui-card-title { @apply font-display text-md font-semibold text-ink; }
+
+.ui-section-title { @apply text-2xs font-semibold uppercase tracking-[0.08em] text-ink-soft; }
+
+.ui-pill {
+  @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-medium leading-4;
+}
+
+.ui-pill-neutral { @apply bg-surface-2 text-ink-soft ring-1 ring-inset ring-line; }
+.ui-pill-brand { @apply bg-brand-wash text-brand-ink ring-1 ring-inset ring-brand-tint; }
+.ui-pill-ok { @apply bg-ok-bg text-ok; }
+.ui-pill-warn { @apply bg-warn-bg text-warn; }
+.ui-pill-bad { @apply bg-bad-bg text-bad; }
+.ui-pill-info { @apply bg-info-bg text-info; }
+
+/* Alerts */
+.ui-alert {
+  @apply flex items-start gap-2.5 rounded-control border px-3 py-2.5 text-sm;
+}
+.ui-alert-error { @apply border-bad/25 bg-bad-bg text-bad; }
+.ui-alert-success { @apply border-ok/25 bg-ok-bg text-ok; }
+.ui-alert-warning { @apply border-warn/25 bg-warn-bg text-warn; }
+.ui-alert-info { @apply border-info/25 bg-info-bg text-info; }
+
+/* Board group header: colour-tinted strip, like a board's group title bar. */
+.ui-group-head {
+  @apply flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-ink;
+}
+
+/* Loading */
+.ui-spinner {
+  @apply inline-block h-4 w-4 shrink-0 rounded-full border-2 border-current border-r-transparent align-[-0.125em];
+  animation: ui-spin 0.7s linear infinite;
+}
+
+@keyframes ui-spin { to { transform: rotate(360deg); } }
+
+.ui-skeleton {
+  @apply block rounded-md bg-line/70;
+  animation: ui-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes ui-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-spinner { animation-duration: 2.4s; }
+  .ui-skeleton { animation: none; }
+}
+
+/* Dialog: a native <dialog> opened with showModal(), which supplies the focus trap, Escape and
+   the inert backdrop. */
+.ui-dialog {
+  @apply m-auto w-[min(28rem,calc(100vw-2rem))] rounded-card border-0 bg-surface p-0 text-ink;
+  box-shadow: var(--shadow-overlay);
+}
+.ui-dialog::backdrop { background: rgb(41 37 36 / 0.4); }
+.ui-dialog[open] { animation: ui-dialog-in 0.14s ease-out; }
+
+@keyframes ui-dialog-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Toasts */
+.ui-toasts {
+  @apply pointer-events-none fixed bottom-20 right-4 z-[70] flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2 md:bottom-4;
+}
+.ui-toast {
+  @apply pointer-events-auto flex items-start gap-2.5 rounded-control border border-line bg-surface px-3 py-2.5 text-sm text-ink;
+  box-shadow: var(--shadow-overlay);
+  animation: ui-dialog-in 0.16s ease-out;
+}
+
+/* App shell: the rail is a bottom bar on phones, an icon rail on tablets and a labelled
+   sidebar on desktops. The tooltip only exists in the icon-only band, where the label is
+   otherwise invisible. */
+.rail-link { position: relative; }
+
+@media (min-width: 48rem) and (max-width: 63.999rem) {
+  .rail-link[data-tip]:hover::after,
+  .rail-link[data-tip]:focus-visible::after {
+    content: attr(data-tip);
+    position: absolute;
+    left: calc(100% + 0.6rem);
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 50;
+    white-space: nowrap;
+    border-radius: 6px;
+    background: var(--color-ink);
+    color: #fff;
+    font-size: var(--text-xs);
+    line-height: 1;
+    padding: 0.4rem 0.55rem;
+    pointer-events: none;
+  }
+}
+
+.user-menu > summary { list-style: none; }
+.user-menu > summary::-webkit-details-marker { display: none; }
+
+.skip-link {
+  @apply absolute left-3 top-2 z-[80] -translate-y-16 rounded-control bg-ink px-3 py-2 text-sm font-medium text-white no-underline transition-transform;
+}
+.skip-link:focus { @apply translate-y-0 text-white; }
+

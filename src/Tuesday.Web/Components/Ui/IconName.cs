@@ -1,0 +1,41 @@
+namespace Tuesday.Web.Components.Ui;
+
+/// <summary>The app's own icon set. Each name maps to an original 24×24 stroke drawing in <see cref="Icon"/>.</summary>
+public enum IconName
+{
+    Workspace,
+    Search,
+    Bell,
+    Key,
+    Shield,
+    SignOut,
+    Plus,
+    ChevronRight,
+    ChevronDown,
+    ChevronLeft,
+    ArrowUp,
+    ArrowDown,
+    Heart,
+    Trash,
+    Calendar,
+    Text,
+    Hash,
+    Person,
+    Status,
+    Check,
+    External,
+    Menu,
+    Close,
+    Board,
+    Alert,
+    Info,
+    Inbox,
+    File,
+    Chart,
+    Subitem,
+    List,
+    Sparkle,
+    Users,
+    Clock,
+    Lock
+}

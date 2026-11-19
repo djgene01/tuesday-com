@@ -1,0 +1,20 @@
+@if (Label is null)
+{
+    <span class="@($"ui-spinner {Class}".TrimEnd())" aria-hidden="true"></span>
+}
+else
+{
+    <span class="inline-flex items-center gap-2" role="status">
+        <span class="@($"ui-spinner {Class}".TrimEnd())" aria-hidden="true"></span>
+        <span class="text-sm text-ink-soft">@Label</span>
+    </span>
+}
+
+@code {
+    /// <summary>Visible, announced text next to the spinner. Without it the spinner is decorative.</summary>
+    [Parameter]
+    public string? Label { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+}

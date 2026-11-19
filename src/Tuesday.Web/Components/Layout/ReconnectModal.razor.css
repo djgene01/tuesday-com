@@ -19,36 +19,37 @@
     display: block;
 }
 
-
+/* Matches the app's dialogs: the same surface, radius, overlay shadow and type. */
 #components-reconnect-modal {
-    background-color: white;
-    width: 20rem;
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    width: min(22rem, calc(100vw - 2rem));
     margin: 20vh auto;
-    padding: 2rem;
+    padding: 1.75rem 1.5rem;
     border: 0;
-    border-radius: 0.5rem;
-    box-shadow: 0 3px 6px 2px rgba(0, 0, 0, 0.3);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-overlay);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
     opacity: 0;
-    transition: display 0.5s allow-discrete, overlay 0.5s allow-discrete;
-    animation: components-reconnect-modal-fadeOutOpacity 0.5s both;
-    &[open]
+    transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete;
+    animation: components-reconnect-modal-fadeOutOpacity 0.3s both;
 
-{
-    animation: components-reconnect-modal-slideUp 1.5s cubic-bezier(.05, .89, .25, 1.02) 0.3s, components-reconnect-modal-fadeInOpacity 0.5s ease-in-out 0.3s;
-    animation-fill-mode: both;
-}
-
+    &[open] {
+        animation: components-reconnect-modal-slideUp 0.4s cubic-bezier(.05, .89, .25, 1.02) 0.3s, components-reconnect-modal-fadeInOpacity 0.3s ease-in-out 0.3s;
+        animation-fill-mode: both;
+    }
 }
 
 #components-reconnect-modal::backdrop {
-    background-color: rgba(0, 0, 0, 0.4);
-    animation: components-reconnect-modal-fadeInOpacity 0.5s ease-in-out;
+    background-color: rgb(41 37 36 / 0.4);
+    animation: components-reconnect-modal-fadeInOpacity 0.3s ease-in-out;
     opacity: 1;
 }
 
 @keyframes components-reconnect-modal-slideUp {
     0% {
-        transform: translateY(30px) scale(0.95);
+        transform: translateY(12px) scale(0.98);
     }
 
     100% {
@@ -86,33 +87,44 @@
 #components-reconnect-modal p {
     margin: 0;
     text-align: center;
+    color: var(--color-ink-soft);
 }
 
 #components-reconnect-modal button {
+    height: 2rem;
+    padding: 0 1rem;
     border: 0;
-    background-color: #6b9ed2;
-    color: white;
-    padding: 4px 24px;
-    border-radius: 4px;
+    border-radius: var(--radius-control);
+    background-color: var(--color-brand);
+    color: #fff;
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
 }
 
     #components-reconnect-modal button:hover {
-        background-color: #3b6ea2;
+        background-color: var(--color-brand-hover);
     }
 
     #components-reconnect-modal button:active {
-        background-color: #6b9ed2;
+        background-color: var(--color-brand-press);
+    }
+
+    #components-reconnect-modal button:focus-visible {
+        outline: 2px solid var(--color-brand);
+        outline-offset: 2px;
     }
 
 .components-rejoining-animation {
     position: relative;
-    width: 80px;
-    height: 80px;
+    width: 56px;
+    height: 56px;
 }
 
     .components-rejoining-animation div {
         position: absolute;
-        border: 3px solid #0087ff;
+        border: 3px solid var(--color-brand);
         opacity: 1;
         border-radius: 50%;
         animation: components-rejoining-animation 1.5s cubic-bezier(0, 0.2, 0.8, 1) infinite;
@@ -124,24 +136,24 @@
 
 @keyframes components-rejoining-animation {
     0% {
-        top: 40px;
-        left: 40px;
+        top: 28px;
+        left: 28px;
         width: 0;
         height: 0;
         opacity: 0;
     }
 
     4.9% {
-        top: 40px;
-        left: 40px;
+        top: 28px;
+        left: 28px;
         width: 0;
         height: 0;
         opacity: 0;
     }
 
     5% {
-        top: 40px;
-        left: 40px;
+        top: 28px;
+        left: 28px;
         width: 0;
         height: 0;
         opacity: 1;
@@ -150,8 +162,8 @@
     100% {
         top: 0px;
         left: 0px;
-        width: 80px;
-        height: 80px;
+        width: 56px;
+        height: 56px;
         opacity: 0;
     }
 }

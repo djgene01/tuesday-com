@@ -164,7 +164,7 @@ One deliberate choice worth naming: interactive circuits can run two handlers at
 | Cache | **Redis** | Read caching, and the backplane when a second replica lands |
 | Sanitising | **HtmlSanitizer** (MIT) | Allow-list, not block-list |
 | Styling | **Tailwind CSS v4** with a token layer (`@theme`) | One source of truth for colour, type and shape; no bespoke component CSS |
-| Type | **Poppins** + **Figtree**, self-hosted | Display and UI faces, served from `wwwroot/fonts` — no CDN call |
+| Type | **Outfit** (+ Reenie Beanie on the landing page), self-hosted | One variable face for UI, data and headings, served from `wwwroot/fonts` — no CDN call |
 | Packaging | **Docker** multi-stage, non-root, Compose | On-prem, Windows Server or Linux |
 
 ### Design

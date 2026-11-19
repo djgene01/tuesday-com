@@ -1,0 +1,73 @@
+@*
+    A labelled form field. Put the control in ChildContent with class="ui-input" (or ui-select,
+    ui-textarea). Without For, the label wraps the control, which associates them implicitly.
+    With For (the control's id), the label points at it and the hint and error get ids the
+    control can reference: aria-describedby="@Field.DescribedBy(id)".
+*@
+
+@if (For is null)
+{
+    <label class="@ClassName" @attributes="Attributes">
+        <span class="ui-label">@Label @OptionalMark</span>
+        @ChildContent
+        @if (Hint is not null)
+        {
+            <span class="ui-hint">@Hint</span>
+        }
+        @if (Error is not null)
+        {
+            <span class="ui-error" role="alert">@Error</span>
+        }
+    </label>
+}
+else
+{
+    <div class="@ClassName" @attributes="Attributes">
+        <label class="ui-label" for="@For">@Label @OptionalMark</label>
+        @ChildContent
+        @if (Hint is not null)
+        {
+            <span class="ui-hint" id="@($"{For}-hint")">@Hint</span>
+        }
+        @if (Error is not null)
+        {
+            <span class="ui-error" id="@($"{For}-error")" role="alert">@Error</span>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>The id of the control inside; switches to an explicit label/for pairing.</summary>
+    [Parameter]
+    public string? For { get; set; }
+
+    [Parameter]
+    public string? Hint { get; set; }
+
+    [Parameter]
+    public string? Error { get; set; }
+
+    [Parameter]
+    public bool Optional { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? Attributes { get; set; }
+
+    private RenderFragment? OptionalMark => Optional
+        ? @<span class="font-normal text-ink-soft">(optional)</span>
+        : null;
+
+    private string ClassName => string.IsNullOrEmpty(Class) ? "block" : "block " + Class;
+
+    /// <summary>The aria-describedby value for a control whose Field has a hint.</summary>
+    public static string DescribedBy(string id) => $"{id}-hint";
+}

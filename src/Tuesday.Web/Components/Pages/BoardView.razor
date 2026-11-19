@@ -13,35 +13,28 @@
 
 @if (_board is null)
 {
-    <main class="shell">
-        <p class="eyebrow">404</p>
-        <h1>Board not found</h1>
-        <p class="lede">Either it does not exist, or it is not shared with you.</p>
-        <p><a href="/workspace">Back to your workspace</a></p>
-    </main>
+    <NotFoundPanel Title="Board not found" Message="Either it does not exist, or it is not shared with you." />
 }
 else
 {
-    <main class="mx-auto max-w-[1600px]">
-        <nav class="mb-1 flex items-center gap-1.5 text-xs text-ink-soft" aria-label="Breadcrumb">
-            <a class="hover:text-brand" href="/workspace">@_board.WorkspaceName</a>
-            <span aria-hidden="true">/</span>
-            <span class="text-ink-faint">@_board.Type</span>
-        </nav>
-
-        <div class="mb-4 flex flex-wrap items-center gap-3">
-            <h1 class="font-display text-[26px] font-semibold leading-tight tracking-tight text-ink">@_board.Name</h1>
-            @if (!_board.CanEdit)
-            {
-                <span class="ui-pill border border-line bg-canvas text-ink-soft">Read-only</span>
-            }
-            <a class="ui-btn-primary ml-auto !h-9 !px-4 text-[13px]" href="/board/@Id/dashboard">
-                Dashboard
-            </a>
-        </div>
+    <div class="mx-auto max-w-[1600px]">
+        <PageHeader Title="@_board.Name" Class="mb-4"
+                    Crumbs="@([new Crumb(_board.WorkspaceName, "/workspace"), new Crumb(_board.Name)])">
+            <Badges>
+                <span class="ui-pill ui-pill-neutral">@_board.Type</span>
+                @if (!_board.CanEdit)
+                {
+                    <span class="ui-pill ui-pill-neutral"><Icon Name="IconName.Lock" Class="h-3 w-3" />Read-only</span>
+                }
+            </Badges>
+            <Actions>
+                <Button Href="@($"/board/{Id}/subitems")" Variant="ButtonVariant.Quiet" IconStart="IconName.Subitem">Sub-item columns</Button>
+                <Button Href="@($"/board/{Id}/dashboard")" Variant="ButtonVariant.Ghost" IconStart="IconName.Chart">Dashboard</Button>
+            </Actions>
+        </PageHeader>
 
         <BoardViewsHost BoardId="Id" CanEdit="_board.CanEdit" @rendermode="InteractiveServer" />
-    </main>
+    </div>
 }
 
 @code {

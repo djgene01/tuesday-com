@@ -175,6 +175,10 @@ builder.Services.AddOpenIddict()
 builder.Services.AddTuesdayAuthorization();
 builder.Services.AddScoped<TenantContextBootstrapper>();
 
+// One toast stack per circuit: every interactive island on a page shares the scope, so a
+// toast raised by the update thread appears in the host the layout renders.
+builder.Services.AddScoped<Tuesday.Web.Components.Ui.ToastService>();
+
 // Traces are exported to the console in P0 so the pipeline is visible without an
 // external collector; the OTLP exporter replaces this in the deployment phase.
 builder.Services.AddOpenTelemetry()

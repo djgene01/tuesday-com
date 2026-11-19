@@ -8,6 +8,11 @@
 
 @Body
 
-<div id="blazor-error-ui" role="alert" class="fixed inset-x-0 bottom-0 z-50 hidden bg-status-stuck px-4 py-2 text-sm text-white">
-    Something went wrong. <a class="underline" href=".">Reload</a>
+<div id="blazor-error-ui" role="alert">
+    <Icon Name="IconName.Alert" Class="h-4 w-4 shrink-0" />
+    <span>Something went wrong and the page stopped responding.</span>
+    <a href="." class="reload">Reload</a>
+    <button type="button" class="dismiss" aria-label="Dismiss">
+        <Icon Name="IconName.Close" Class="h-4 w-4" />
+    </button>
 </div>

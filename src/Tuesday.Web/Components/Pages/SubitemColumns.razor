@@ -12,36 +12,21 @@
 
 @if (_board is null)
 {
-    <main class="shell">
-        <p class="eyebrow">404</p>
-        <h1>Board not found</h1>
-        <p class="lede">Either it does not exist, or it is not shared with you.</p>
-        <p><a href="/workspace">Back to your workspace</a></p>
-    </main>
+    <NotFoundPanel Title="Board not found" Message="Either it does not exist, or it is not shared with you." />
 }
 else
 {
-    <main class="mx-auto max-w-[1100px]">
-        <nav class="mb-1 flex items-center gap-1.5 text-xs text-ink-soft" aria-label="Breadcrumb">
-            <a class="no-underline hover:text-brand" href="/workspace">@_board.WorkspaceName</a>
-            <span aria-hidden="true">/</span>
-            <a class="no-underline hover:text-brand" href="@($"/board/{Id}")">@_board.Name</a>
-            <span aria-hidden="true">/</span>
-            <span class="text-ink-faint">Sub-items</span>
-        </nav>
-
-        <div class="mb-4 flex flex-wrap items-center gap-3">
-            <div>
-                <h1 class="font-display text-[26px] font-semibold leading-tight tracking-tight text-ink" tabindex="-1">Sub-item columns</h1>
-                <p class="mt-0.5 text-[13px] text-ink-soft">
-                    Columns that belong to @_board.Name's sub-items, independent of the board's own columns.
-                </p>
-            </div>
-            <a class="ui-btn-ghost ml-auto !h-9 !px-4 text-[13px]" href="@($"/board/{Id}")">Back to board</a>
-        </div>
+    <div class="mx-auto max-w-[1100px]">
+        <PageHeader Title="Sub-item columns" Class="mb-4"
+                    Crumbs="@([new Crumb(_board.WorkspaceName, "/workspace"), new Crumb(_board.Name, $"/board/{Id}"), new Crumb("Sub-items")])">
+            <Subtitle>Columns that belong to @_board.Name's sub-items, independent of the board's own columns.</Subtitle>
+            <Actions>
+                <Button Href="@($"/board/{Id}")" Variant="ButtonVariant.Ghost" IconStart="IconName.ChevronLeft">Back to board</Button>
+            </Actions>
+        </PageHeader>
 
         <SubitemColumnsEditor BoardId="Id" CanEdit="_board.CanEdit" @rendermode="InteractiveServer" />
-    </main>
+    </div>
 }
 
 @code {

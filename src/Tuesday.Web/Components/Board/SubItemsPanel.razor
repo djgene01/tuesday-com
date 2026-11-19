@@ -5,63 +5,58 @@
 @inject BoardQueries Queries
 @inject ItemEditor Editor
 @inject TenantContextBootstrapper Bootstrapper
+@inject ToastService Toasts
 
 @*
     Sub-items live in their own interactive island because the item page itself is static
     SSR: a button with @onclick there would render and then do nothing.
 *@
 
-<section class="ui-card mt-4 overflow-hidden" aria-label="Sub-items">
-    <header class="flex items-center gap-3 border-b border-line px-4 py-3">
-        <h2 class="font-display text-[15px] font-semibold text-ink">Sub-items</h2>
-        <span class="text-xs text-ink-faint">@(_parent?.SubItems.Count ?? 0)</span>
+<section class="ui-card mt-4 overflow-hidden" aria-labelledby="subitems-title">
+    <header class="ui-card-head">
+        <h2 id="subitems-title" class="ui-card-title">Sub-items</h2>
+        <span class="ui-pill ui-pill-neutral">@(_parent?.SubItems.Count ?? 0)</span>
     </header>
 
     @if (_error is not null)
     {
-        <p class="border-b border-line bg-status-stuck/10 px-4 py-2 text-sm text-status-stuck" role="alert">@_error</p>
+        <div class="border-b border-line px-4 py-3"><Alert Kind="AlertKind.Error">@_error</Alert></div>
     }
 
-    @if (_parent is null)
+    @if (!_loaded)
     {
-        <p class="px-4 py-4 text-sm text-ink-faint">Loading…</p>
+        <div class="px-4 py-4"><Skeleton Lines="2" /></div>
     }
-    else if (_parent.SubItems.Count > 0)
+    else if (_parent is { SubItems.Count: > 0 })
     {
-        <ul class="divide-y divide-line">
+        <ul class="m-0 list-none divide-y divide-line p-0">
             @foreach (var sub in _parent.SubItems)
             {
-                <li class="flex items-center gap-3 px-4 py-2">
-                    <span class="text-ink-faint" aria-hidden="true">└</span>
-                    <a class="text-[13px] font-medium text-ink no-underline hover:text-brand hover:underline"
+                <li class="relative flex items-center gap-3 px-4 py-2.5 transition hover:bg-surface-2">
+                    <Icon Name="IconName.Subitem" Class="h-4 w-4 shrink-0 text-ink-soft" />
+                    <a class="min-w-0 flex-1 truncate text-sm font-medium text-ink no-underline after:absolute after:inset-0 hover:text-brand-ink hover:underline"
                        href="@($"/board/{BoardId}/item/{sub.Id}")">@sub.Name</a>
+                    <Icon Name="IconName.ChevronRight" Class="h-4 w-4 shrink-0 text-ink-soft" />
                 </li>
             }
         </ul>
     }
     else
     {
-        <p class="px-4 py-4 text-sm text-ink-soft">No sub-items yet.</p>
+        <p class="m-0 px-4 py-4 text-sm text-ink-soft">No sub-items yet. Break this item into smaller steps below.</p>
     }
 
-    @if (CanEdit)
+    @if (CanEdit && _parent is not null)
     {
-        <div class="border-t border-line px-4 py-3">
-            <label class="block">
-                <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">Add a sub-item</span>
-                <input type="text" @bind="_name" @bind:event="oninput" placeholder="Sub-item name"
-                       aria-label="Add a sub-item"
-                       class="h-9 w-full rounded-control border border-line-strong bg-surface px-3 text-sm text-ink outline-none transition placeholder:text-ink-faint focus:border-brand focus:ring-2 focus:ring-brand/20" />
-            </label>
-            <div class="mt-2 flex items-center gap-3">
-                <p class="text-[11px] text-ink-faint">Sub-items inherit this item's group and can be reordered in the grid.</p>
-                <button type="button" class="ui-btn-primary ml-auto !h-8 !px-3 text-[13px] disabled:opacity-50"
-                        disabled="@(string.IsNullOrWhiteSpace(_name) || _busy)"
-                        @onclick="AddAsync">
-                    @(_busy ? "Adding…" : "Add")
-                </button>
-            </div>
-        </div>
+        <form class="border-t border-line bg-surface-2/60 px-4 py-3" @onsubmit="AddAsync" @onsubmit:preventDefault>
+            <Field Label="Add a sub-item" For="@_inputId" Hint="Sub-items inherit this item's group and can be reordered in the grid.">
+                <div class="flex gap-2">
+                    <input id="@_inputId" type="text" @bind="_name" @bind:event="oninput" placeholder="Sub-item name"
+                           aria-describedby="@Field.DescribedBy(_inputId)" class="ui-input" maxlength="500" />
+                    <Button Type="submit" IconStart="IconName.Plus" Busy="_busy" Disabled="@string.IsNullOrWhiteSpace(_name)">Add</Button>
+                </div>
+            </Field>
+        </form>
     }
 </section>
 
@@ -75,7 +70,9 @@
     [Parameter]
     public bool CanEdit { get; set; }
 
+    private readonly string _inputId = "subitem-" + Guid.NewGuid().ToString("n")[..8];
     private ItemView? _parent;
+    private bool _loaded;
     private string _name = string.Empty;
     private string? _error;
     private bool _busy;
@@ -90,11 +87,12 @@
     {
         var board = await Queries.GetAsync(BoardId);
         _parent = board?.Items.FirstOrDefault(item => item.Id == ItemId);
+        _loaded = true;
     }
 
     private async Task AddAsync()
     {
-        if (_parent is null || _busy)
+        if (_parent is null || _busy || string.IsNullOrWhiteSpace(_name))
         {
             return;
         }
@@ -103,7 +101,8 @@
 
         try
         {
-            var result = await Editor.AddAsync(BoardId, _parent.GroupId, _name, _parent.Id);
+            var name = _name.Trim();
+            var result = await Editor.AddAsync(BoardId, _parent.GroupId, name, _parent.Id);
 
             if (!result.Succeeded)
             {
@@ -114,6 +113,7 @@
             _error = null;
             _name = string.Empty;
             await LoadAsync();
+            Toasts.Success($"Sub-item \"{name}\" added.");
         }
         finally
         {

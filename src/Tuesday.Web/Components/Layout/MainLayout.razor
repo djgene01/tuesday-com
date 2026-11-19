@@ -1,114 +1,209 @@
 @inherits LayoutComponentBase
-@inject NavigationManager Nav
+@using Tuesday.Application.Tenancy
+@using Tuesday.Infrastructure.Collaboration
+@inject ITenantContext Tenant
+@inject NotificationService Inbox
+@inject ILogger<MainLayout> Logger
 
 @*
-    Shell: the reference product's chrome. A narrow fixed icon rail on the left, a white 48px top bar,
-    and content on a soft grey canvas. Colour is reserved for the active rail item, the
-    primary action and the board statuses — everything else stays neutral so the data reads.
+    The signed-in shell. One navigation list, three presentations, all CSS:
+      - below md: a fixed bottom bar with the five destinations (icon + short label);
+      - md to lg: a 56px icon rail, labels as hover/focus tooltips;
+      - lg and up: a 208px labelled sidebar.
+    The top bar carries the brand, a plain GET search form (works without a circuit) and a
+    <details> user menu, so nothing here needs JavaScript.
 *@
+
+<a class="skip-link" href="#main">Skip to content</a>
 
 <div class="min-h-screen bg-canvas font-sans text-ink antialiased">
 
-    <aside class="fixed inset-y-0 left-0 z-30 flex w-14 flex-col items-center border-r border-line bg-surface py-3"
-           aria-label="Primary">
-        <a href="/" class="mb-4 grid h-8 w-8 place-items-center rounded-lg bg-brand text-sm font-bold text-white font-display"
-           aria-label="Tuesday.com home">T</a>
+    <AuthorizeView>
+        <Authorized>
+            <nav class="fixed inset-x-0 bottom-0 z-30 flex h-14 border-t border-line bg-surface md:inset-x-auto md:inset-y-0 md:left-0 md:h-auto md:w-14 md:flex-col md:items-center md:border-r md:border-t-0 md:py-3 lg:w-52 lg:items-stretch lg:px-3"
+                 aria-label="Primary">
+                <a href="/workspace" class="mb-5 hidden items-center gap-2.5 text-ink no-underline md:flex lg:px-1.5" aria-label="Tuesday.com — workspace">
+                    <span class="grid h-8 w-8 shrink-0 place-items-center rounded-control bg-brand font-display text-sm font-bold text-white">T</span>
+                    <span class="hidden font-display text-md font-semibold tracking-tight lg:inline">Tuesday<span class="text-brand">.</span>com</span>
+                </a>
 
-        <AuthorizeView>
-            <Authorized>
-                <nav class="flex flex-col items-center gap-1" aria-label="Workspace">
-                    <NavLink class="@RailLink" ActiveClass="@RailLinkActive" href="/workspace" aria-label="Workspace">
-                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 10.5 12 3l9 7.5M5 9.5V21h14V9.5" />
-                        </svg>
-                    </NavLink>
-                    <NavLink class="@RailLink" ActiveClass="@RailLinkActive" href="/search" aria-label="Search">
-                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
-                            <circle cx="11" cy="11" r="7" /><path stroke-linecap="round" d="m20 20-3.5-3.5" />
-                        </svg>
-                    </NavLink>
-                    <NavLink class="@RailLink" ActiveClass="@RailLinkActive" href="/notifications" aria-label="Notifications">
-                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M18 8a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7M10.3 20a2 2 0 0 0 3.4 0" />
-                        </svg>
-                    </NavLink>
-                    <NavLink class="@RailLink" ActiveClass="@RailLinkActive" href="/account/tokens" aria-label="API tokens">
-                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
-                            <circle cx="8" cy="15" r="4" /><path stroke-linecap="round" d="m11 12 9-9m-3 0h3v3" />
-                        </svg>
-                    </NavLink>
-                    <NavLink class="@RailLink" ActiveClass="@RailLinkActive" href="/account/security" aria-label="Security">
-                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3Z" />
-                        </svg>
-                    </NavLink>
-                </nav>
+                <ul class="m-0 flex w-full list-none justify-around p-0 md:flex-col md:items-center md:justify-start md:gap-1 lg:items-stretch">
+                    @foreach (var link in Links)
+                    {
+                        <li class="flex-1 md:flex-none">
+                            @{ var badge = link.Href == "/notifications" && _unread > 0; }
+                            <NavLink class="@RailLink" ActiveClass="is-active" href="@link.Href" Match="NavLinkMatch.Prefix"
+                                     aria-label="@(badge ? $"{link.Label}, {_unread} unread" : link.Label)" data-tip="@link.Label">
+                                <span class="relative">
+                                    <Icon Name="link.Icon" Class="h-5 w-5" />
+                                    @if (badge)
+                                    {
+                                        <span class="absolute -right-2 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-2xs font-semibold leading-none text-white lg:hidden"
+                                              aria-hidden="true">@UnreadLabel</span>
+                                    }
+                                </span>
+                                <span class="text-2xs md:sr-only lg:not-sr-only lg:flex-1 lg:text-sm" aria-hidden="true">@link.Label</span>
+                                @if (badge)
+                                {
+                                    <span class="hidden rounded-full bg-brand px-1.5 py-0.5 text-2xs font-semibold leading-none text-white lg:inline" aria-hidden="true">@UnreadLabel</span>
+                                }
+                            </NavLink>
+                        </li>
+                    }
+                </ul>
+            </nav>
+        </Authorized>
+    </AuthorizeView>
 
-                <div class="mt-auto flex flex-col items-center gap-2">
-                    <span class="grid h-8 w-8 place-items-center rounded-full bg-brand-tint text-xs font-semibold text-brand-ink"
-                          title="@context.User.Identity?.Name">@Initials(context.User.Identity?.Name)</span>
-                    <form method="post" action="/logout" class="inline-form">
-                        <AntiforgeryToken />
-                        <button type="submit" class="@RailLink hover:text-status-stuck" aria-label="Sign out" title="Sign out">
-                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 17l5-5-5-5M20 12H9M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6" />
-                            </svg>
-                        </button>
-                    </form>
-                </div>
-            </Authorized>
-            <NotAuthorized>
-                @* No CTA in the rail: it reads as a floating widget over the page. The top
-                   bar carries the sign-in link instead. *@
-            </NotAuthorized>
-        </AuthorizeView>
-    </aside>
-
-    <div class="pl-14">
-        <header class="sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-line bg-surface px-5">
-            <a class="font-display text-[15px] font-semibold tracking-tight text-ink no-underline hover:no-underline" href="/">
-                Tuesday<span class="text-brand">.</span>com
-            </a>
-            <span class="h-4 w-px bg-line" aria-hidden="true"></span>
+    <div class="@ContentPad">
+        <header class="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-line bg-surface/95 px-4 backdrop-blur md:px-6">
             <AuthorizeView>
                 <Authorized>
-                    <span class="truncate text-xs text-ink-soft">@context.User.Identity?.Name</span>
+                    <a class="flex items-center gap-2 font-display text-md font-semibold tracking-tight text-ink no-underline md:hidden" href="/workspace">
+                        <span class="grid h-7 w-7 place-items-center rounded-control bg-brand text-xs font-bold text-white" aria-hidden="true">T</span>
+                        <span class="sr-only">Tuesday.com</span>
+                    </a>
+
+                    <form class="relative hidden max-w-md flex-1 sm:block" method="get" action="/search" role="search">
+                        <label for="shell-search" class="sr-only">Search items and updates</label>
+                        <span class="pointer-events-none absolute inset-y-0 left-3 grid place-items-center text-ink-soft" aria-hidden="true">
+                            <Icon Name="IconName.Search" Class="h-4 w-4" />
+                        </span>
+                        <input id="shell-search" type="search" name="q" placeholder="Search items and updates"
+                               class="ui-input ui-input-sm bg-surface-2 pl-9" autocomplete="off" />
+                    </form>
+
+                    <details class="user-menu relative ml-auto">
+                        <summary class="flex cursor-pointer items-center gap-2 rounded-control px-1.5 py-1 hover:bg-surface-2"
+                                 aria-label="Account menu">
+                            <Avatar Name="@context.User.Identity?.Name" Size="28" />
+                            <span class="hidden max-w-[16rem] truncate text-sm text-ink md:inline">@context.User.Identity?.Name</span>
+                            <Icon Name="IconName.ChevronDown" Class="h-3.5 w-3.5 text-ink-soft" />
+                        </summary>
+                        <div class="absolute right-0 top-[calc(100%+6px)] z-40 w-64 overflow-hidden rounded-card border border-line bg-surface py-1.5 shadow-[var(--shadow-overlay)]">
+                            <p class="m-0 border-b border-line px-3 pb-2 pt-1 text-xs text-ink-soft">
+                                Signed in as<br /><span class="break-all text-sm font-medium text-ink">@context.User.Identity?.Name</span>
+                                @if (Tenant.Role is { } role)
+                                {
+                                    <span class="ui-pill ui-pill-neutral mt-1">@role</span>
+                                }
+                            </p>
+                            <a class="@MenuItem" href="/account/security"><Icon Name="IconName.Shield" Class="h-4 w-4 text-ink-soft" />Security</a>
+                            <a class="@MenuItem" href="/account/tokens"><Icon Name="IconName.Key" Class="h-4 w-4 text-ink-soft" />API tokens</a>
+                            <form method="post" action="/logout" class="m-0 border-t border-line pt-1">
+                                <AntiforgeryToken />
+                                <button type="submit" class="@($"{MenuItem} w-full cursor-pointer border-0 bg-transparent text-left font-[inherit]")">
+                                    <Icon Name="IconName.SignOut" Class="h-4 w-4 text-ink-soft" />Sign out
+                                </button>
+                            </form>
+                        </div>
+                    </details>
                 </Authorized>
                 <NotAuthorized>
-                    <span class="text-xs text-ink-soft">Work operating system</span>
-                    <a class="ui-btn-primary ml-auto !h-8 !py-0 px-3.5 text-[12px] leading-none" href="/login">Sign in</a>
+                    <a class="flex items-center gap-2 font-display text-md font-semibold tracking-tight text-ink no-underline" href="/">
+                        <span class="grid h-7 w-7 place-items-center rounded-control bg-brand text-xs font-bold text-white" aria-hidden="true">T</span>
+                        <span>Tuesday<span class="text-brand">.</span>com</span>
+                    </a>
+                    <span class="hidden text-xs text-ink-soft sm:inline">Work operating system</span>
+                    <Button Href="/login" Size="ButtonSize.Sm" Class="ml-auto">Sign in</Button>
                 </NotAuthorized>
             </AuthorizeView>
         </header>
 
-        <div class="px-5 py-5">
-            @Body
-        </div>
+        <main id="main" tabindex="-1" class="px-4 py-6 outline-none md:px-6">
+            <ErrorBoundary>
+                <ChildContent>
+                    @Body
+                </ChildContent>
+                <ErrorContent>
+                    <div class="mx-auto max-w-[640px] py-6">
+                        <EmptyState Title="This part of the page could not load" IconName="IconName.Alert">
+                            <ChildContent>Something went wrong while showing this page. Reloading usually fixes it; if it keeps happening, tell your administrator.</ChildContent>
+                            <Actions>
+                                <Button Href="@CurrentPath" IconStart="IconName.Clock">Reload</Button>
+                                <Button Href="/workspace" Variant="ButtonVariant.Ghost">Back to your workspace</Button>
+                            </Actions>
+                        </EmptyState>
+                    </div>
+                </ErrorContent>
+            </ErrorBoundary>
+        </main>
     </div>
 </div>
 
-<div id="blazor-error-ui" role="alert" class="fixed inset-x-0 bottom-0 z-50 hidden bg-status-stuck px-4 py-2 text-sm text-white">
-    Something went wrong. <a class="underline" href=".">Reload</a>
+<AuthorizeView>
+    <Authorized>
+        <ToastHost />
+    </Authorized>
+</AuthorizeView>
+
+<div id="blazor-error-ui" role="alert">
+    <Icon Name="IconName.Alert" Class="h-4 w-4 shrink-0" />
+    <span>Something went wrong and the page stopped responding.</span>
+    <a href="." class="reload">Reload</a>
+    <button type="button" class="dismiss" aria-label="Dismiss">
+        <Icon Name="IconName.Close" Class="h-4 w-4" />
+    </button>
 </div>
 
 @code {
+    private sealed record RailItem(string Href, string Label, IconName Icon);
+
+    private static readonly RailItem[] Links =
+    [
+        new("/workspace", "Boards", IconName.Workspace),
+        new("/search", "Search", IconName.Search),
+        new("/notifications", "Notifications", IconName.Bell),
+        new("/account/tokens", "API tokens", IconName.Key),
+        new("/account/security", "Security", IconName.Shield)
+    ];
+
     private const string RailLink =
-        "grid h-9 w-9 place-items-center rounded-lg text-ink-faint transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
+        "rail-link flex h-14 flex-col items-center justify-center gap-0.5 text-ink-soft no-underline transition-colors hover:text-ink "
+        + "md:h-10 md:w-10 md:rounded-control md:hover:bg-surface-2 "
+        + "lg:h-9 lg:w-auto lg:flex-row lg:justify-start lg:gap-2.5 lg:px-2.5 "
+        + "[&.is-active]:text-brand-ink md:[&.is-active]:bg-brand-wash lg:[&.is-active]:font-medium "
+        + "[&.is-active]:shadow-[inset_0_2px_0_var(--color-brand)] md:[&.is-active]:shadow-[inset_2px_0_0_var(--color-brand)]";
 
-    private const string RailLinkActive = "bg-brand-tint text-brand-ink";
+    private const string MenuItem =
+        "flex items-center gap-2.5 px-3 py-2 text-sm text-ink no-underline hover:bg-surface-2";
 
-    private static string Initials(string? name)
+    private int _unread;
+    private bool _signedIn;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    [CascadingParameter]
+    private HttpContext? Http { get; set; }
+
+    private string ContentPad => _signedIn ? "pb-14 md:pb-0 md:pl-14 lg:pl-52" : string.Empty;
+
+    private string UnreadLabel => _unread > 9 ? "9+" : _unread.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private string CurrentPath => Http is { } http ? http.Request.Path + http.Request.QueryString : "/workspace";
+
+    protected override async Task OnInitializedAsync()
     {
-        if (string.IsNullOrWhiteSpace(name))
+        if (AuthState is not null)
         {
-            return "?";
+            var state = await AuthState;
+            _signedIn = state.User.Identity?.IsAuthenticated == true;
         }
 
-        var local = name.Split('@')[0];
-        var parts = local.Split(['.', '_', '-'], StringSplitOptions.RemoveEmptyEntries);
+        if (!_signedIn || Tenant.UserId is not { } userId)
+        {
+            return;
+        }
 
-        return parts.Length >= 2
-            ? string.Concat(char.ToUpperInvariant(parts[0][0]), char.ToUpperInvariant(parts[1][0]))
-            : local[..Math.Min(2, local.Length)].ToUpperInvariant();
+        try
+        {
+            _unread = await Inbox.UnreadCountAsync(userId);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // A badge is a nicety: if the count cannot be read, the shell still renders.
+            Logger.LogWarning(exception, "Could not read the unread notification count.");
+        }
     }
 }

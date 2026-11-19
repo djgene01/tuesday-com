@@ -1,0 +1,62 @@
+@rendermode InteractiveServer
+@implements IDisposable
+@inject ToastService Toasts
+
+@*
+    The one place toasts appear. A polite live region that is always in the DOM, so a screen
+    reader announces each message as it is inserted. Each toast dismisses itself after five
+    seconds and can be closed sooner.
+*@
+
+<div class="ui-toasts" aria-live="polite" aria-atomic="false" role="region" aria-label="Notifications">
+    @foreach (var toast in Toasts.Current)
+    {
+        <div class="ui-toast" @key="toast.Id">
+            <span class="@IconTone(toast.Kind)">
+                <Icon Name="@(toast.Kind == AlertKind.Error ? IconName.Alert : toast.Kind == AlertKind.Success ? IconName.Check : IconName.Info)" Class="mt-0.5 h-4 w-4" />
+            </span>
+            <p class="m-0 min-w-0 flex-1 break-words">@toast.Message</p>
+            <button type="button" class="ui-btn-quiet ui-btn-sm ui-btn-icon -my-1 -mr-1"
+                    aria-label="Dismiss" @onclick="() => Toasts.Dismiss(toast.Id)">
+                <Icon Name="IconName.Close" Class="h-3.5 w-3.5" />
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly TimeSpan Lifetime = TimeSpan.FromSeconds(5);
+    private readonly HashSet<Guid> _scheduled = [];
+
+    protected override void OnInitialized() => Toasts.Changed += OnChanged;
+
+    private void OnChanged()
+    {
+        foreach (var toast in Toasts.Current)
+        {
+            if (_scheduled.Add(toast.Id))
+            {
+                _ = ExpireAsync(toast.Id);
+            }
+        }
+
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ExpireAsync(Guid id)
+    {
+        await Task.Delay(Lifetime);
+        _scheduled.Remove(id);
+        Toasts.Dismiss(id);
+    }
+
+    private static string IconTone(AlertKind kind) => kind switch
+    {
+        AlertKind.Error => "text-bad",
+        AlertKind.Success => "text-ok",
+        AlertKind.Warning => "text-warn",
+        _ => "text-info"
+    };
+
+    public void Dispose() => Toasts.Changed -= OnChanged;
+}

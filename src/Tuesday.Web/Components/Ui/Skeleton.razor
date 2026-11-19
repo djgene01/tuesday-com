@@ -1,0 +1,35 @@
+@*
+    Placeholder rows while data loads. The shapes are hidden from assistive tech; one
+    polite "Loading" status speaks for them.
+*@
+
+<div class="@($"flex flex-col gap-2.5 {Class}".TrimEnd())" role="status">
+    <span class="sr-only">@Label</span>
+    @for (var i = 0; i < Lines; i++)
+    {
+        <span class="ui-skeleton @Height" style="width:@(Width(i))" aria-hidden="true"></span>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Lines { get; set; } = 3;
+
+    [Parameter]
+    public string Height { get; set; } = "h-4";
+
+    [Parameter]
+    public string Label { get; set; } = "Loading…";
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    // A ragged edge reads as text; identical bars read as a table.
+    private static string Width(int index) => (index % 4) switch
+    {
+        0 => "92%",
+        1 => "76%",
+        2 => "84%",
+        _ => "60%"
+    };
+}

@@ -1,0 +1,48 @@
+@*
+    Inline feedback. Errors are announced assertively (role="alert"), everything else politely
+    (role="status"). Works in static SSR, so it is the fallback wherever toasts cannot run.
+*@
+
+<div class="@($"ui-alert {KindClass} {Class}".TrimEnd())" role="@(Kind == AlertKind.Error ? "alert" : "status")" @attributes="Attributes">
+    <Icon Name="@KindIcon" Class="mt-0.5 h-4 w-4 shrink-0" />
+    <div class="min-w-0 flex-1 break-words">
+        @if (Title is not null)
+        {
+            <p class="m-0 font-semibold">@Title</p>
+        }
+        @ChildContent
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public AlertKind Kind { get; set; } = AlertKind.Info;
+
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? Attributes { get; set; }
+
+    private string KindClass => Kind switch
+    {
+        AlertKind.Error => "ui-alert-error",
+        AlertKind.Success => "ui-alert-success",
+        AlertKind.Warning => "ui-alert-warning",
+        _ => "ui-alert-info"
+    };
+
+    private IconName KindIcon => Kind switch
+    {
+        AlertKind.Error => IconName.Alert,
+        AlertKind.Success => IconName.Check,
+        AlertKind.Warning => IconName.Alert,
+        _ => IconName.Info
+    };
+}

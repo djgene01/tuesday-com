@@ -1,0 +1,22 @@
+@*
+    The single "not found" design, shared by the catch-all 404 page and every board-scoped page
+    that cannot find (or may not reveal) its board or item. Never says which of the two it is.
+*@
+
+<div class="mx-auto max-w-[640px] py-10">
+    <EmptyState Title="@Title" Code="404" Heading="true">
+        <ChildContent>@Message</ChildContent>
+        <Actions>
+            <Button Href="/workspace">Back to your workspace</Button>
+            <Button Href="/search" Variant="ButtonVariant.Ghost" IconStart="IconName.Search">Search</Button>
+        </Actions>
+    </EmptyState>
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = "Not found";
+
+    [Parameter]
+    public string Message { get; set; } = "That page does not exist, or it is not shared with you.";
+}

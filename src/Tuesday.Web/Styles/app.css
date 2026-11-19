@@ -1,9 +1,10 @@
 /*
  * Tuesday.com — Tailwind v4 source.
  *
- * Base style: Tailwind utilities. The design language follows the public reference UI: a violet primary,
- * Poppins display type, pill-shaped actions, a compact data grid with solid colour status
- * cells and a purple-underline view bar.
+ * One design system: the tokens below drive every utility (`bg-brand`, `text-ok`, `text-sm`,
+ * `rounded-control`), and wwwroot/app.css aliases its older `--tue-*` variables onto them, so
+ * there is exactly one place a colour or size is decided. The reusable pieces live as Razor
+ * primitives in Components/Ui/ and as the `.ui-*` classes in components.css.
  *
  * No preflight is imported on purpose. The app still ships its long-standing semantic
  * stylesheet (app.css) for forms and secondary pages; pulling in Tailwind's reset would
@@ -17,24 +18,32 @@
  * invisible. Unlayered utilities loaded after app.css win on source order instead.
  */
 @import "tailwindcss/theme.css";
+/* Components first, utilities second: a utility on a call site (`pl-9`, `rounded-pill`, `mt-4`)
+   must beat the component it decorates, which is what used to need `!important`. */
+@import "./components.css";
 @import "tailwindcss/utilities.css";
 
 @source "../Components/**/*.razor";
 @source "../Components/**/*.cs";
 
-@theme {
-  /* Brand — Digital Wellness: peach carries fills behind ink text, a deeper coral carries text.
-     Peach on the canvas is 1.6:1, so it is never used for words; the coral measures 5.0:1. */
+/* `static` so every token is emitted as a custom property even when no utility uses it: the
+   older stylesheet and the C# colour helpers read them through var(). */
+@theme static {
+  /* Brand — peach carries fills behind ink text, a deeper coral carries text and the primary
+     action. Peach on the canvas is 1.6:1, so it is never used for words; the coral measures
+     5.0:1 on the canvas and white on the coral measures 5.2:1. */
   --color-brand: #a8554e;
   --color-brand-hover: #9e4b45;
   --color-brand-press: #8f423c;
   --color-brand-tint: #ffb7b2;
+  --color-brand-wash: #fff1ef;
   --color-brand-ink: #7a3b35;
   --color-peach: #ffb7b2;
   --color-sage: #e8efe8;
   --color-lavender: #efedf4;
 
-  /* Neutrals — monday's in-product greys */
+  /* Neutrals. ink-faint stays an alias of ink-soft: anything lighter than #78716c drops below
+     4.5:1 on the canvas, so there is no honest third text tone. */
   --color-ink: #292524;
   --color-ink-soft: #78716c;
   --color-ink-faint: #78716c;
@@ -42,8 +51,19 @@
   --color-line-strong: #d6d3d1;
   --color-canvas: #fdfcf8;
   --color-surface: #ffffff;
+  --color-surface-2: #faf9f6;
 
-  /* Status palette */
+  /* Semantic feedback. Each text colour is AA (≥ 4.5:1) on its own background. */
+  --color-ok: #007a4d;
+  --color-ok-bg: #e7f6f0;
+  --color-warn: #8a4b00;
+  --color-warn-bg: #fdf3e3;
+  --color-bad: #b3243b;
+  --color-bad-bg: #fdeceb;
+  --color-info: #2f5f9e;
+  --color-info-bg: #eaf1fb;
+
+  /* Status palette — solid fills inside status cells only. */
   --color-status-done: #00c875;
   --color-status-working: #fdab3d;
   --color-status-stuck: #c42b45;
@@ -55,51 +75,34 @@
   --font-display: "Outfit", "Segoe UI", system-ui, sans-serif;
   --font-sans: "Outfit", "Segoe UI", system-ui, -apple-system, sans-serif;
 
-  /* Shape */
+  /* Type scale. 11px is the floor; nothing in the app is set smaller. */
+  --text-2xs: 11px;
+  --text-2xs--line-height: 16px;
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 13px;
+  --text-sm--line-height: 20px;
+  --text-base: 14px;
+  --text-base--line-height: 22px;
+  --text-md: 15px;
+  --text-md--line-height: 22px;
+  --text-lg: 18px;
+  --text-lg--line-height: 26px;
+  --text-xl: 22px;
+  --text-xl--line-height: 28px;
+  --text-2xl: 26px;
+  --text-2xl--line-height: 32px;
+
+  /* Shape. App surfaces are tight; only the public landing page keeps the soft 2rem curve. */
   --radius-pill: 999px;
-  --radius-card: 2rem;
-  --radius-control: 12px;
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --radius-marketing: 2rem;
 
-  --shadow-card: 0 4px 20px -2px rgb(0 0 0 / 0.05);
+  --shadow-card: 0 1px 2px rgb(41 37 36 / 0.04), 0 4px 16px -4px rgb(41 37 36 / 0.06);
   --shadow-pop: 0 12px 40px -8px rgb(0 0 0 / 0.10);
+  --shadow-overlay: 0 24px 48px -12px rgb(41 37 36 / 0.25), 0 0 0 1px rgb(41 37 36 / 0.06);
 }
-
-/* --- Component layer: the pieces that repeat across boards ------------------------- */
-
-/* Components: plain rules, so they sit in the same unlayered cascade as the utilities. */
-  .ui-btn,
-  .ui-btn-primary,
-  .ui-btn-ghost,
-  .ui-btn-quiet {
-    @apply inline-flex items-center justify-center gap-2 rounded-full border border-transparent
-           px-4 py-2 text-sm font-medium transition-colors duration-150;
-  }
-
-  .ui-btn-primary {
-    @apply bg-brand-tint text-ink hover:brightness-95 active:brightness-90;
-  }
-
-  .ui-btn-ghost {
-    @apply border-line bg-surface text-ink hover:bg-canvas;
-  }
-
-  .ui-btn-quiet {
-    @apply bg-transparent text-ink-soft hover:bg-canvas hover:text-ink;
-  }
-
-  .ui-card {
-    @apply rounded-[2rem] border border-line bg-surface;
-  }
-
-  .ui-pill {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
-  }
-
-  /* Board group header: colour-tinted strip, like a board's group title bar. */
-  .ui-group-head {
-    @apply flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-ink;
-  }
-
 
 /* Sanitised update HTML. There is no typography plugin here, so the few elements the
    allow-list can produce are styled explicitly. */
@@ -107,6 +110,6 @@
 .prose-update p { margin: 0; }
 .prose-update ul, .prose-update ol { margin: 0; padding-left: 1.15rem; list-style: revert; }
 .prose-update blockquote { margin: 0; border-left: 3px solid var(--color-line); padding-left: 0.75rem; color: var(--color-ink-soft); }
-.prose-update code { border-radius: 4px; background: var(--color-canvas); padding: 0.1rem 0.3rem; font-size: 0.85em; }
+.prose-update code { border-radius: 4px; background: var(--color-surface-2); padding: 0.1rem 0.3rem; font-size: 0.85em; }
 .prose-update a { color: var(--color-brand); text-decoration: underline; text-underline-offset: 2px; }
 .prose-update strong { font-weight: 600; }

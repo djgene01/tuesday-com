@@ -1,0 +1,66 @@
+@*
+    One stroke icon. Decorative by default (aria-hidden); pass Label to make it the accessible
+    name of its own, for an icon that stands alone without visible text next to it.
+    The drawings are original, built from simple primitives on a 24px grid.
+*@
+
+<svg class="@(Class ?? "h-4 w-4")" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+     stroke-width="@StrokeWidth" stroke-linecap="round" stroke-linejoin="round"
+     aria-hidden="@(Label is null ? "true" : null)" role="@(Label is null ? null : "img")"
+     aria-label="@Label" focusable="false">
+    @((MarkupString)Paths(Name))
+</svg>
+
+@code {
+    [Parameter, EditorRequired]
+    public IconName Name { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
+    public string? Label { get; set; }
+
+    [Parameter]
+    public string StrokeWidth { get; set; } = "1.75";
+
+    private static string Paths(IconName name) => name switch
+    {
+        IconName.Workspace => "<path d=\"M3 10.5 12 3l9 7.5\"/><path d=\"M5 9.5V21h14V9.5\"/><path d=\"M10 21v-6h4v6\"/>",
+        IconName.Search => "<circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"m20 20-3.5-3.5\"/>",
+        IconName.Bell => "<path d=\"M18 8a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7\"/><path d=\"M10.3 20a2 2 0 0 0 3.4 0\"/>",
+        IconName.Key => "<circle cx=\"8\" cy=\"15\" r=\"4\"/><path d=\"m11 12 9-9\"/><path d=\"m17 3 3 3\"/><path d=\"m15 7 2 2\"/>",
+        IconName.Shield => "<path d=\"M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3Z\"/>",
+        IconName.SignOut => "<path d=\"M15 17l5-5-5-5\"/><path d=\"M20 12H9\"/><path d=\"M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6\"/>",
+        IconName.Plus => "<path d=\"M12 5v14\"/><path d=\"M5 12h14\"/>",
+        IconName.ChevronRight => "<path d=\"m9 6 6 6-6 6\"/>",
+        IconName.ChevronDown => "<path d=\"m6 9 6 6 6-6\"/>",
+        IconName.ChevronLeft => "<path d=\"m15 6-6 6 6 6\"/>",
+        IconName.ArrowUp => "<path d=\"M12 19V5\"/><path d=\"m6 11 6-6 6 6\"/>",
+        IconName.ArrowDown => "<path d=\"M12 5v14\"/><path d=\"m6 13 6 6 6-6\"/>",
+        IconName.Heart => "<path d=\"M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z\"/>",
+        IconName.Trash => "<path d=\"M4 7h16\"/><path d=\"M9 7V4h6v3\"/><path d=\"M6 7l1 13h10l1-13\"/><path d=\"M10 11v6\"/><path d=\"M14 11v6\"/>",
+        IconName.Calendar => "<rect x=\"3.5\" y=\"5\" width=\"17\" height=\"15\" rx=\"2\"/><path d=\"M3.5 10h17\"/><path d=\"M8 3v4\"/><path d=\"M16 3v4\"/>",
+        IconName.Text => "<path d=\"M5 6h14\"/><path d=\"M5 12h14\"/><path d=\"M5 18h9\"/>",
+        IconName.Hash => "<path d=\"M9 4 7 20\"/><path d=\"M17 4l-2 16\"/><path d=\"M4 9h16\"/><path d=\"M3 15h16\"/>",
+        IconName.Person => "<circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4.5 20a7.5 7.5 0 0 1 15 0\"/>",
+        IconName.Status => "<circle cx=\"12\" cy=\"12\" r=\"8.5\"/><circle cx=\"12\" cy=\"12\" r=\"3.5\" fill=\"currentColor\" stroke=\"none\"/>",
+        IconName.Check => "<path d=\"m5 12.5 4.5 4.5L19 7.5\"/>",
+        IconName.External => "<path d=\"M14 4h6v6\"/><path d=\"m20 4-9 9\"/><path d=\"M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5\"/>",
+        IconName.Menu => "<path d=\"M4 7h16\"/><path d=\"M4 12h16\"/><path d=\"M4 17h16\"/>",
+        IconName.Close => "<path d=\"m6 6 12 12\"/><path d=\"M18 6 6 18\"/>",
+        IconName.Board => "<rect x=\"3.5\" y=\"4.5\" width=\"17\" height=\"15\" rx=\"2\"/><path d=\"M3.5 9.5h17\"/><path d=\"M9.5 9.5v10\"/>",
+        IconName.Alert => "<path d=\"M12 4 2.8 19.5h18.4L12 4Z\"/><path d=\"M12 10v4.5\"/><path d=\"M12 17.2v.1\"/>",
+        IconName.Info => "<circle cx=\"12\" cy=\"12\" r=\"8.5\"/><path d=\"M12 11v5.5\"/><path d=\"M12 7.8v.1\"/>",
+        IconName.Inbox => "<path d=\"M3.5 13.5 6 5h12l2.5 8.5\"/><path d=\"M3.5 13.5V19h17v-5.5h-5a3.5 3.5 0 0 1-7 0h-5Z\"/>",
+        IconName.File => "<path d=\"M14 3.5H7a1.5 1.5 0 0 0-1.5 1.5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8L14 3.5Z\"/><path d=\"M14 3.5V8h4.5\"/>",
+        IconName.Chart => "<path d=\"M4 20V4\"/><path d=\"M4 20h16\"/><path d=\"M8 16v-4\"/><path d=\"M12 16V8\"/><path d=\"M16 16v-6\"/>",
+        IconName.Subitem => "<path d=\"M6 4v9a3 3 0 0 0 3 3h9\"/><path d=\"m15 13 3 3-3 3\"/>",
+        IconName.List => "<path d=\"M9 6h11\"/><path d=\"M9 12h11\"/><path d=\"M9 18h11\"/><path d=\"M4.5 6h.01\"/><path d=\"M4.5 12h.01\"/><path d=\"M4.5 18h.01\"/>",
+        IconName.Sparkle => "<path d=\"M12 3v4\"/><path d=\"M12 17v4\"/><path d=\"M3 12h4\"/><path d=\"M17 12h4\"/><path d=\"m6 6 2.5 2.5\"/><path d=\"m15.5 15.5 2.5 2.5\"/><path d=\"m6 18 2.5-2.5\"/><path d=\"m15.5 8.5 2.5-2.5\"/>",
+        IconName.Users => "<circle cx=\"9\" cy=\"8.5\" r=\"3.5\"/><path d=\"M2.5 20a6.5 6.5 0 0 1 13 0\"/><path d=\"M16 5.2a3.5 3.5 0 0 1 0 6.6\"/><path d=\"M18 14.4a6.5 6.5 0 0 1 3.5 5.6\"/>",
+        IconName.Clock => "<circle cx=\"12\" cy=\"12\" r=\"8.5\"/><path d=\"M12 7.5V12l3 2\"/>",
+        IconName.Lock => "<rect x=\"5\" y=\"10.5\" width=\"14\" height=\"10\" rx=\"2\"/><path d=\"M8 10.5V7.5a4 4 0 0 1 8 0v3\"/>",
+        _ => string.Empty
+    };
+}

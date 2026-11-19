@@ -5,20 +5,19 @@
 @implements IAsyncDisposable
 @inject DependencyService Dependencies
 @inject ITenantContext Tenant
+@inject ToastService Toasts
 
 @if (Model.Timeline.Bars.Count == 0)
 {
-    <p class="meta">No item on this board has a start date, so there is nothing to draw.</p>
+    <EmptyState Title="Nothing to draw yet" IconName="IconName.Chart">
+        No item on this board has a start date, so there is nothing to draw. Add a date in the table view and it appears here.
+    </EmptyState>
 }
 else
 {
     @if (_error is not null)
     {
-        <p class="alert alert-bad" role="alert">@_error</p>
-    }
-    @if (_notice is not null)
-    {
-        <p class="alert alert-good" role="status">@_notice</p>
+        <Alert Kind="AlertKind.Error" Class="mb-3">@_error</Alert>
     }
 
     <div class="gantt" role="table" aria-label="Board gantt">
@@ -51,7 +50,7 @@ else
         @foreach (var row in Rows)
         {
             <div class="gantt-row" role="row">
-                <span class="gantt-label" role="cell">@row.Bar.Name</span>
+                <span class="tl-label" role="cell"><a href="@($"/board/{Board.Id}/item/{row.Bar.ItemId}")" title="@row.Bar.Name">@row.Bar.Name</a></span>
                 <div class="tl-track" role="cell">
                     <div class="tl-bar tl-bar-gantt"
                          style="@Style(row.Bar)"
@@ -63,60 +62,68 @@ else
         }
     </div>
 
-    <section class="gantt-links-panel">
-        <h2>Dependencies</h2>
-        <p class="meta">@VisibleLinks.Count arrows drawn from @Model.Links.Count stored links.</p>
+    <section class="ui-card mt-6 p-4" aria-labelledby="gantt-deps-title">
+        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h2 id="gantt-deps-title" class="ui-card-title">Dependencies</h2>
+            <p class="m-0 text-xs text-ink-soft">@VisibleLinks.Count arrows drawn from @Model.Links.Count stored links.</p>
+        </div>
 
         @if (CanEdit)
         {
-            <div class="gantt-form">
-                <label class="field">
-                    <span>This item</span>
-                    <select @bind="_successorId">
+            <form class="mt-3 flex flex-wrap items-end gap-3" @onsubmit="AddAsync" @onsubmit:preventDefault>
+                <Field Label="This item" Class="w-full sm:w-56">
+                    <select class="ui-select" @bind="_successorId">
                         <option value="@Guid.Empty">Choose an item</option>
                         @foreach (var choice in Choices)
                         {
                             <option value="@choice.Id">@choice.Name</option>
                         }
                     </select>
-                </label>
+                </Field>
 
-                <label class="field">
-                    <span>depends on</span>
-                    <select @bind="_predecessorId">
+                <Field Label="Depends on" Class="w-full sm:w-56">
+                    <select class="ui-select" @bind="_predecessorId">
                         <option value="@Guid.Empty">Choose an item</option>
                         @foreach (var choice in Choices)
                         {
                             <option value="@choice.Id">@choice.Name</option>
                         }
                     </select>
-                </label>
+                </Field>
 
-                <button type="button" class="btn" @onclick="AddAsync">Add dependency</button>
-            </div>
-            <p class="meta">A link that would close a loop is refused.</p>
+                <Button Type="submit" IconStart="IconName.Plus" Busy="_busy">Add dependency</Button>
+            </form>
+            <p class="m-0 mt-1.5 text-xs text-ink-soft">A link that would close a loop is refused.</p>
         }
 
         @if (Model.Links.Count > 0)
         {
-            <ul class="gantt-link-list">
+            <ul class="m-0 mt-4 list-none divide-y divide-line border-t border-line p-0">
                 @foreach (var link in Model.Links)
                 {
-                    <li>
-                        <span>@NameOf(link.ToItemId) waits on @NameOf(link.FromItemId)</span>
+                    <li class="flex items-center justify-between gap-2 py-2 text-sm">
+                        <span><span class="font-medium">@NameOf(link.ToItemId)</span> <span class="text-ink-soft">waits on</span> <span class="font-medium">@NameOf(link.FromItemId)</span></span>
                         @if (CanEdit)
                         {
-                            <button type="button" class="btn-quiet"
-                                    @onclick="() => RemoveAsync(link)"
+                            <Button Variant="ButtonVariant.QuietDanger" Size="ButtonSize.Sm"
+                                    @onclick="() => AskRemoveAsync(link)"
                                     aria-label="@($"Remove dependency {NameOf(link.ToItemId)} on {NameOf(link.FromItemId)}")">
                                 Remove
-                            </button>
+                            </Button>
                         }
                     </li>
                 }
             </ul>
         }
     </section>
+
+    <ConfirmDialog @ref="_confirmRemove" Title="Remove this dependency?" ConfirmLabel="Remove dependency" OnConfirm="RemoveAsync">
+        <p class="m-0">
+            <span class="font-medium text-ink">@(_pendingRemove is { } pending ? NameOf(pending.ToItemId) : string.Empty)</span>
+            will no longer wait on
+            <span class="font-medium text-ink">@(_pendingRemove is { } p ? NameOf(p.FromItemId) : string.Empty)</span>.
+        </p>
+    </ConfirmDialog>
 }
 
 @code {
@@ -143,7 +150,9 @@ else
 
     private IReadOnlyList<Tuesday.Domain.Boards.ItemDependency> _dependencies = [];
     private string? _error;
-    private string? _notice;
+    private bool _busy;
+    private ConfirmDialog? _confirmRemove;
+    private GanttLink? _pendingRemove;
     private Guid _predecessorId;
     private Guid _successorId;
 
@@ -245,9 +254,8 @@ else
     private async Task AddAsync()
     {
         _error = null;
-        _notice = null;
 
-        if (!CanEdit || Tenant.TenantId is not { } tenantId)
+        if (!CanEdit || _busy || Tenant.TenantId is not { } tenantId)
         {
             return;
         }
@@ -258,26 +266,57 @@ else
             return;
         }
 
-        var result = await Dependencies.AddAsync(BoardId, _successorId, _predecessorId, tenantId);
-        if (!result.Succeeded)
+        _busy = true;
+
+        try
         {
-            _error = result.Error;
+            var result = await Dependencies.AddAsync(BoardId, _successorId, _predecessorId, tenantId);
+            if (!result.Succeeded)
+            {
+                _error = result.Error;
+                return;
+            }
+
+            Toasts.Success("Dependency added.");
+            await LoadLinksAsync();
+            await OnChanged.InvokeAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task AskRemoveAsync(GanttLink link)
+    {
+        _pendingRemove = link;
+
+        if (_confirmRemove is not null)
+        {
+            await _confirmRemove.OpenAsync();
+        }
+    }
+
+    private async Task RemoveAsync()
+    {
+        if (_pendingRemove is not { } link)
+        {
             return;
         }
 
-        _notice = "Dependency added.";
-        await LoadLinksAsync();
-        await OnChanged.InvokeAsync();
-    }
-
-    private async Task RemoveAsync(GanttLink link)
-    {
         _error = null;
-        _notice = null;
 
-        await Dependencies.RemoveAsync(BoardId, link.ToItemId, link.FromItemId);
-        await LoadLinksAsync();
-        await OnChanged.InvokeAsync();
+        try
+        {
+            await Dependencies.RemoveAsync(BoardId, link.ToItemId, link.FromItemId);
+            await LoadLinksAsync();
+            Toasts.Success("Dependency removed.");
+            await OnChanged.InvokeAsync();
+        }
+        finally
+        {
+            _pendingRemove = null;
+        }
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;

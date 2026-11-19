@@ -13,50 +13,58 @@
 
 <PageTitle>Search — Tuesday.com</PageTitle>
 
-<main class="mx-auto max-w-[900px]">
-    <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-soft">Everything you can see</p>
-    <h1 class="mt-1 font-display text-[26px] font-semibold leading-tight tracking-tight text-ink">Search</h1>
+<div class="mx-auto max-w-[900px]">
+    <PageHeader Title="Search" Eyebrow="Everything you can see" />
 
-    <form class="mt-4 flex gap-2" method="get" action="/search" role="search">
-        <label class="block flex-1">
+    <form class="flex gap-2" method="get" action="/search" role="search">
+        <label class="relative block flex-1">
             <span class="sr-only">Search items and updates</span>
+            <span class="pointer-events-none absolute inset-y-0 left-3 grid place-items-center text-ink-soft" aria-hidden="true">
+                <Icon Name="IconName.Search" Class="h-4 w-4" />
+            </span>
             <input type="search" name="q" value="@Query" placeholder="Item names and update text" autofocus
-                   class="h-10 w-full rounded-full border border-line-strong bg-surface px-4 text-sm text-ink outline-none transition placeholder:text-ink-faint focus:border-brand focus:ring-2 focus:ring-brand/20" />
+                   class="ui-input ui-input-lg pl-9" />
         </label>
-        <button type="submit" class="ui-btn-primary h-10 px-5">Search</button>
+        <Button Type="submit" Size="ButtonSize.Lg">Search</Button>
     </form>
 
     @if (string.IsNullOrWhiteSpace(Query))
     {
-        <p class="mt-6 text-sm text-ink-soft">Search runs over the boards you can open — item names first, then what people wrote.</p>
+        <EmptyState Title="Search your boards" IconName="IconName.Search" Bare="true" Compact="true" Class="mt-6">
+            Search runs over the boards you can open — item names first, then what people wrote.
+        </EmptyState>
     }
     else if (_hits is null)
     {
-        <p class="mt-6 text-sm text-ink-faint">Loading…</p>
+        <div class="ui-card mt-6 p-4"><Skeleton Lines="4" /></div>
     }
     else if (_hits.Count == 0)
     {
-        <p class="mt-6 text-sm text-ink-soft">Nothing matches “@Query”.</p>
+        <EmptyState Title="@($"Nothing matches “{Query}”")" IconName="IconName.Search" Compact="true" Class="mt-6">
+            Try fewer words, or check the spelling. Only boards shared with you are searched.
+        </EmptyState>
     }
     else
     {
-        <p class="mt-5 text-xs text-ink-faint">@_hits.Count result@(_hits.Count == 1 ? string.Empty : "s") for “@Query”</p>
-        <ul class="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
+        <p class="m-0 mt-5 text-xs text-ink-soft" role="status">@_hits.Count result@(_hits.Count == 1 ? string.Empty : "s") for “@Query”</p>
+        <ul class="ui-card m-0 mt-2 list-none divide-y divide-line overflow-hidden p-0">
             @foreach (var hit in _hits)
             {
-                <li class="flex flex-wrap items-center gap-3 px-4 py-3 transition hover:bg-canvas/70">
-                    <span class="ui-pill @(hit.Kind == "update" ? "bg-brand-tint text-brand-ink" : "bg-canvas text-ink-soft")">@hit.Kind</span>
-                    <a class="text-[13px] font-medium text-ink no-underline hover:text-brand hover:underline" href="@LinkFor(hit)">@hit.Title</a>
-                    <span class="text-[11px] text-ink-faint">@hit.BoardName</span>
+                <li class="relative flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 transition hover:bg-surface-2">
+                    <span class="ui-pill @(hit.Kind == "update" ? "ui-pill-brand" : "ui-pill-neutral")">@(hit.Kind == "update" ? "Update" : "Item")</span>
+                    <a class="text-sm font-medium text-ink no-underline after:absolute after:inset-0 hover:text-brand-ink hover:underline" href="@LinkFor(hit)">@hit.Title</a>
+                    <span class="flex items-center gap-1 text-xs text-ink-soft">
+                        <Icon Name="IconName.Board" Class="h-3.5 w-3.5" />@hit.BoardName
+                    </span>
                     @if (hit.Kind == "update")
                     {
-                        <p class="w-full pl-1 text-[12px] text-ink-soft">@hit.Snippet</p>
+                        <p class="m-0 w-full text-xs text-ink-soft">@hit.Snippet</p>
                     }
                 </li>
             }
         </ul>
     }
-</main>
+</div>
 
 @code {
     [SupplyParameterFromQuery(Name = "q")]

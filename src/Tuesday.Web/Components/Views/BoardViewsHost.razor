@@ -13,30 +13,32 @@
 @inject TenantContextBootstrapper Bootstrapper
 @inject NavigationManager Navigation
 
-<div class="mb-3 flex items-end gap-1 overflow-x-auto border-b border-line" role="tablist" aria-label="Board views">
+@* The views are addresses (?view=id), so they are links, not ARIA tabs: a link can be opened
+   in a new tab, bookmarked and shared, and aria-current marks the one on screen. *@
+<nav class="mb-4 flex items-end gap-1 overflow-x-auto border-b border-line" aria-label="Board views">
     @foreach (var view in _views)
     {
         var current = view.Id == _activeId;
-        <button type="button"
-                role="tab"
-                class="group -mb-px flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-[13px] transition-colors @(current ? "border-brand font-semibold text-ink" : "border-transparent text-ink-soft hover:border-line-strong hover:text-ink")"
-                aria-selected="@(current ? "true" : "false")"
-                @onclick="() => SelectAsync(view.Id)">
+        <a href="@($"/board/{BoardId}?view={view.Id}")"
+           class="@($"group -mb-px flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm no-underline transition-colors {(current ? "border-brand font-medium text-ink" : "border-transparent text-ink-soft hover:border-line-strong hover:text-ink")}")"
+           aria-current="@(current ? "page" : null)"
+           @onclick="() => _error = null">
+            <Icon Name="@KindIcon(view.Type)" Class="@($"h-4 w-4 {(current ? "text-brand" : "text-ink-soft")}")" />
             <span>@view.Name</span>
-            <span class="rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-medium leading-none text-ink-faint group-hover:text-ink-soft">@Kind(view.Type)</span>
-        </button>
+            <span class="sr-only">(@Kind(view.Type))</span>
+        </a>
     }
-    <p class="ml-auto pb-2 text-[11px] text-ink-faint">@_views.Count of @BoardView.MaxViewsPerBoard views</p>
-</div>
+    <p class="m-0 ml-auto hidden shrink-0 pb-2 pl-3 text-xs text-ink-soft sm:block">@_views.Count of @BoardView.MaxViewsPerBoard views</p>
+</nav>
 
 @if (_error is not null)
 {
-    <p class="alert alert-bad" role="alert">@_error</p>
+    <Alert Kind="AlertKind.Error" Class="mb-3">@_error</Alert>
 }
 
 @if (_board is null)
 {
-    <p class="meta">Loading…</p>
+    <div class="ui-card p-4"><Skeleton Lines="6" Height="h-6" /></div>
 }
 else if (_active is null || _active.Type == ViewType.Grid)
 {
@@ -177,13 +179,6 @@ else if (_active.Type == ViewType.Gantt)
         return candidate ?? Guid.Empty;
     }
 
-    private Task SelectAsync(Guid viewId)
-    {
-        _error = null;
-        Navigation.NavigateTo($"/board/{BoardId}?view={viewId}");
-        return Task.CompletedTask;
-    }
-
     private async Task ReloadAsync()
     {
         await LoadAsync();
@@ -197,5 +192,14 @@ else if (_active.Type == ViewType.Gantt)
         ViewType.Timeline => "Timeline",
         ViewType.Gantt => "Gantt",
         _ => "View"
+    };
+
+    private static IconName KindIcon(ViewType type) => type switch
+    {
+        ViewType.Kanban => IconName.Board,
+        ViewType.Calendar => IconName.Calendar,
+        ViewType.Timeline => IconName.Clock,
+        ViewType.Gantt => IconName.Chart,
+        _ => IconName.List
     };
 }

@@ -1,0 +1,116 @@
+@*
+    The one button. Works in static SSR (a submit button or a link) and in interactive islands
+    (@onclick passes through the splatted attributes). Busy disables the control, shows a
+    spinner and sets aria-busy, so a double submit cannot happen.
+*@
+
+@if (Href is not null)
+{
+    <a @attributes="Attributes" href="@Href" class="@CssClass" aria-disabled="@(Disabled ? "true" : null)">
+        @if (IconStart is { } start)
+        {
+            <Icon Name="start" Class="@IconClass" />
+        }
+        @ChildContent
+        @if (IconEnd is { } end)
+        {
+            <Icon Name="end" Class="@IconClass" />
+        }
+    </a>
+}
+else
+{
+    <button @attributes="Attributes" type="@Type" class="@CssClass" disabled="@(Disabled || Busy)"
+            aria-busy="@(Busy ? "true" : null)">
+        @if (Busy)
+        {
+            <Spinner Class="@IconClass" />
+        }
+        else if (IconStart is { } start)
+        {
+            <Icon Name="start" Class="@IconClass" />
+        }
+        @ChildContent
+        @if (IconEnd is { } end && !Busy)
+        {
+            <Icon Name="end" Class="@IconClass" />
+        }
+    </button>
+}
+
+@code {
+    [Parameter]
+    public ButtonVariant Variant { get; set; } = ButtonVariant.Primary;
+
+    [Parameter]
+    public ButtonSize Size { get; set; } = ButtonSize.Md;
+
+    [Parameter]
+    public bool Busy { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>Renders an anchor instead of a button.</summary>
+    [Parameter]
+    public string? Href { get; set; }
+
+    [Parameter]
+    public string Type { get; set; } = "button";
+
+    [Parameter]
+    public IconName? IconStart { get; set; }
+
+    [Parameter]
+    public IconName? IconEnd { get; set; }
+
+    /// <summary>A square button that holds only an icon; give it an aria-label.</summary>
+    [Parameter]
+    public bool IconOnly { get; set; }
+
+    [Parameter]
+    public bool Block { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? Attributes { get; set; }
+
+    private string IconClass => Size == ButtonSize.Sm ? "h-3.5 w-3.5" : Size == ButtonSize.Lg ? "h-[18px] w-[18px]" : "h-4 w-4";
+
+    private string CssClass
+    {
+        get
+        {
+            var variant = Variant switch
+            {
+                ButtonVariant.Secondary => "ui-btn-secondary",
+                ButtonVariant.Ghost => "ui-btn-ghost",
+                ButtonVariant.Quiet => "ui-btn-quiet",
+                ButtonVariant.Danger => "ui-btn-danger",
+                ButtonVariant.QuietDanger => "ui-btn-quiet is-danger",
+                _ => "ui-btn-primary"
+            };
+
+            var size = Size switch
+            {
+                ButtonSize.Sm => "ui-btn-sm",
+                ButtonSize.Lg => "ui-btn-lg",
+                _ => "ui-btn-md"
+            };
+
+            return string.Join(' ', new[]
+            {
+                variant,
+                size,
+                IconOnly ? "ui-btn-icon" : null,
+                Block ? "ui-btn-block" : null,
+                Class
+            }.Where(part => !string.IsNullOrEmpty(part)));
+        }
+    }
+}

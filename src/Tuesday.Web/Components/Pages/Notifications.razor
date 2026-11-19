@@ -8,62 +8,83 @@
 @inject NotificationService Inbox
 @inject ITenantContext Tenant
 @inject TenantContextBootstrapper Bootstrapper
+@inject ToastService Toasts
 
 <PageTitle>Notifications — Tuesday.com</PageTitle>
 
-<main class="shell">
-    <p class="eyebrow">Your account</p>
-    <div class="board-head">
-        <h1>Notifications</h1>
-        @if (_rows is { Count: > 0 } && _rows.Any(row => !row.IsRead))
-        {
-            <button type="button" class="btn" @onclick="MarkAllAsync" disabled="@_busy">Mark all read</button>
-        }
-    </div>
-
-    <div class="composer">
-        <label class="field checkbox-row">
-            <input type="checkbox" checked="@_emailEnabled" @onchange="ToggleEmailAsync" />
-            <span>Email me about mentions and replies</span>
-        </label>
-        <p class="meta">In-app notifications are always on. Email only goes out when the server has SMTP configured and you have opted in here.</p>
-    </div>
+<div class="mx-auto max-w-[820px]">
+    <PageHeader Title="Notifications" Eyebrow="Your account">
+        <Subtitle>Mentions and replies on items you follow.</Subtitle>
+        <Actions>
+            @if (_rows is { Count: > 0 } && _rows.Any(row => !row.IsRead))
+            {
+                <Button Variant="ButtonVariant.Ghost" IconStart="IconName.Check" @onclick="MarkAllAsync" Busy="_markingAll" Disabled="_busy">Mark all read</Button>
+            }
+        </Actions>
+    </PageHeader>
 
     @if (_rows is null)
     {
-        <p class="meta">Loading…</p>
+        <div class="ui-card p-4"><Skeleton Lines="4" /></div>
     }
     else if (_rows.Count == 0)
     {
-        <p class="lede">Nothing yet. Mentions and replies on items you follow appear here.</p>
+        <EmptyState Title="You're all caught up" IconName="IconName.Inbox">
+            Nothing yet. Mentions and replies on items you follow appear here.
+        </EmptyState>
     }
     else
     {
-        <ul class="notification-list">
+        <ul class="ui-card m-0 list-none divide-y divide-line overflow-hidden p-0" aria-label="Notifications">
             @foreach (var row in _rows)
             {
-                <li class="notification @(row.IsRead ? "is-read" : "is-unread")">
-                    <span class="tag @(row.Kind == Tuesday.Domain.Collaboration.NotificationKind.Mention ? "tag-accent" : "tag-quiet")">
-                        @row.Kind
-                    </span>
-                    <div class="notification-body">
-                        <a href="@row.LinkUrl">@row.Title</a>
-                        <p class="meta">@row.Body</p>
+                var mention = row.Kind == Tuesday.Domain.Collaboration.NotificationKind.Mention;
+                <li class="@($"relative flex items-start gap-3 px-4 py-3 transition hover:bg-surface-2 {(row.IsRead ? "" : "bg-brand-wash/40")}")">
+                    <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full @(row.IsRead ? "bg-transparent" : "bg-brand")" aria-hidden="true"></span>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <a class="@($"text-sm text-ink no-underline after:absolute after:inset-0 hover:underline {(row.IsRead ? "" : "font-semibold")}")"
+                               href="@row.LinkUrl">@row.Title</a>
+                            <span class="ui-pill @(mention ? "ui-pill-brand" : "ui-pill-neutral")">@row.Kind</span>
+                            @if (!row.IsRead)
+                            {
+                                <span class="sr-only">(unread)</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(row.Body))
+                        {
+                            <p class="m-0 mt-0.5 line-clamp-2 text-sm text-ink-soft">@row.Body</p>
+                        }
+                        <time class="mt-1 block text-xs text-ink-soft" datetime="@row.CreatedAt.ToString("O")">@row.CreatedAt.ToLocalTime().ToString("d MMM, HH:mm")</time>
                     </div>
-                    <time datetime="@row.CreatedAt.ToString("O")">@row.CreatedAt.ToLocalTime().ToString("d MMM, HH:mm")</time>
                     @if (!row.IsRead)
                     {
-                        <button type="button" class="btn-quiet" @onclick="() => MarkReadAsync(row.Id)" disabled="@_busy">Mark read</button>
+                        @* Above the stretched link so it stays clickable. *@
+                        <Button Variant="ButtonVariant.Quiet" Size="ButtonSize.Sm" Class="relative z-10 shrink-0"
+                                aria-label="@($"Mark “{row.Title}” as read")"
+                                @onclick="() => MarkReadAsync(row.Id)" Disabled="_busy">Mark read</Button>
                     }
                 </li>
             }
         </ul>
     }
-</main>
+
+    <section class="ui-card mt-6 p-5" aria-labelledby="email-pref-title">
+        <h2 id="email-pref-title" class="ui-card-title">Email</h2>
+        <label class="mt-3 flex cursor-pointer items-start gap-3">
+            <input type="checkbox" class="ui-check mt-0.5" checked="@_emailEnabled" @onchange="ToggleEmailAsync" disabled="@_busy" />
+            <span>
+                <span class="block text-sm font-medium text-ink">Email me about mentions and replies</span>
+                <span class="block text-xs text-ink-soft">In-app notifications are always on. Email only goes out when the server has SMTP configured and you have opted in here.</span>
+            </span>
+        </label>
+    </section>
+</div>
 
 @code {
     private IReadOnlyList<NotificationRow>? _rows;
     private bool _busy;
+    private bool _markingAll;
     private bool _emailEnabled;
 
     protected override async Task OnInitializedAsync()
@@ -90,6 +111,7 @@
         try
         {
             _emailEnabled = await Inbox.SetEmailPreferenceAsync(tenantId, userId, enabled);
+            Toasts.Success(_emailEnabled ? "Email notifications on." : "Email notifications off.");
         }
         finally
         {
@@ -131,14 +153,17 @@
         }
 
         _busy = true;
+        _markingAll = true;
         try
         {
             await Inbox.MarkAllReadAsync(userId);
             await LoadAsync();
+            Toasts.Success("All notifications marked as read.");
         }
         finally
         {
             _busy = false;
+            _markingAll = false;
         }
     }
 }
